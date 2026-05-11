@@ -28,11 +28,33 @@ Source/
 .eggs/
 pip-wheel-metadata/
 
+# Native / CMake build artifacts
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+build.ninja
+.ninja_*
+*.obj
+*.o
+*.exe
+*.dll
+*.so
+*.dylib
+*.pyd
+*.lib
+*.exp
+fire_uav/cpp/build/
+fire_uav/cpp/*.pyd
+
 # Logs and temp
 *.log
 *.log.*
 *.tmp
 *.temp
+*.zip
+*.7z
+*.rar
 
 # Testing / tooling caches
 .pytest_cache/
@@ -58,6 +80,13 @@ data/logs/
 data/notifications/
 data/tmp/
 data/artifacts/logs/
+
+# ML model/checkpoint artifacts
+data/models/
+*.pt
+*.pth
+*.onnx
+*.engine
 
 # Qt / PySide generated cache
 fire_uav/gui/qml/*.qmlc

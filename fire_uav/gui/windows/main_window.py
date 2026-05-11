@@ -1134,6 +1134,81 @@ class AppController(QObject):
             return f"Battery: {float(self._latest_telemetry.battery_percent):.1f}%"
         return "Battery: --"
 
+    @Property(str, notify=statsChanged)
+    def currentAltitudeText(self) -> str:
+        sample = self._latest_telemetry
+        if sample is None:
+            return "--"
+        alt_agl = getattr(sample, "alt_agl", None)
+        if alt_agl is not None:
+            try:
+                return f"{float(alt_agl):.1f} m AGL"
+            except (TypeError, ValueError):
+                pass
+        try:
+            return f"{float(sample.alt):.1f} m"
+        except (TypeError, ValueError):
+            return "--"
+
+    @Property(str, notify=statsChanged)
+    def currentGpsText(self) -> str:
+        sample = self._latest_telemetry
+        if sample is None:
+            return "--"
+        try:
+            return f"{float(sample.lat):.5f}, {float(sample.lon):.5f}"
+        except (TypeError, ValueError):
+            return "--"
+
+    @Property(str, notify=linkStatusChanged)
+    def currentLinkText(self) -> str:
+        return self._link_status.value
+
+    @Property(str, notify=backendChanged)
+    def currentBackendText(self) -> str:
+        return self._backend
+
+    @Property(str, notify=statsChanged)
+    def currentTimeText(self) -> str:
+        return datetime.now().strftime("%H:%M:%S")
+
+    @Property("QVariantList", notify=flightControlsChanged)
+    def routeWaypointItems(self) -> list[dict[str, object]]:
+        points = list(self._active_path.get_active_path() or [])
+        sample = self._latest_telemetry
+        items: list[dict[str, object]] = []
+        for idx, point in enumerate(points):
+            lat = float(point[0])
+            lon = float(point[1])
+            item: dict[str, object] = {
+                "index": idx + 1,
+                "lat": lat,
+                "lon": lon,
+                "label": f"WP{idx + 1}",
+                "distance_m": None,
+            }
+            if sample is not None:
+                try:
+                    item["distance_m"] = float(haversine_m((float(sample.lat), float(sample.lon)), (lat, lon)))
+                except Exception:
+                    item["distance_m"] = None
+            items.append(item)
+        return items
+
+    @Property("QVariantMap", notify=confirmedObjectsChanged)
+    def selectedConfirmedObject(self) -> dict[str, object]:
+        selected = self._objects_store.selected()
+        if selected is None:
+            return {}
+        return {
+            "object_id": selected.object_id,
+            "class_id": selected.class_id,
+            "confidence": selected.confidence,
+            "lat": selected.lat,
+            "lon": selected.lon,
+            "track_id": selected.track_id,
+        }
+
     @Property(bool, notify=statsChanged)
     def busAlive(self) -> bool:
         return self._bus_alive
