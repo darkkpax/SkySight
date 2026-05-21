@@ -23,7 +23,6 @@ importtime*.txt
 # Dependencies / builds
 build/
 dist/
-Source/
 *.egg-info/
 .eggs/
 pip-wheel-metadata/
