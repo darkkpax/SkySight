@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sys
 import time
-from datetime import datetime
 from types import SimpleNamespace
 from types import ModuleType
 
@@ -10,14 +9,14 @@ _debug_sim_stub = ModuleType("fire_uav.services.debug_sim")
 _debug_sim_stub.DebugSimulationService = object
 sys.modules.setdefault("fire_uav.services.debug_sim", _debug_sim_stub)
 
-import fire_uav.infrastructure.providers as deps
-from fire_uav.gui.windows.main_window import AppController, OrbitFlowState
-from fire_uav.module_core.energy.python_energy_model import PythonEnergyModel
-from fire_uav.module_core.route.maneuvers import build_rejoin
-from fire_uav.module_core.schema import Route, TelemetrySample, Waypoint
-from fire_uav.services.mission.state import MissionState
-from fire_uav.services.objects_store import ConfirmedObject
-from fire_uav.utils.time import utc_now
+import fire_uav.infrastructure.providers as deps  # noqa: E402
+from fire_uav.gui.windows.main_window import AppController, OrbitFlowState  # noqa: E402
+from fire_uav.module_core.energy.python_energy_model import PythonEnergyModel  # noqa: E402
+from fire_uav.module_core.route.maneuvers import build_rejoin  # noqa: E402
+from fire_uav.module_core.schema import Route, TelemetrySample, Waypoint  # noqa: E402
+from fire_uav.services.mission.state import MissionState  # noqa: E402
+from fire_uav.services.objects_store import ConfirmedObject  # noqa: E402
+from fire_uav.utils.time import utc_now  # noqa: E402
 
 
 class _Signal:

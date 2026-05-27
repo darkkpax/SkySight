@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from types import SimpleNamespace
 
 from fire_uav.module_core.factories import get_energy_model

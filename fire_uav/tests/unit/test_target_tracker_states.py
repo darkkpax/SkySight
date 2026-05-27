@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 from fire_uav.services.targets.target_tracker import (
     TargetObservation,
     TargetTrackState,

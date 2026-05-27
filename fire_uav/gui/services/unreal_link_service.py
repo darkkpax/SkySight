@@ -16,7 +16,6 @@ from PySide6.QtGui import QImage
 
 from fire_uav.core.protocol import MapBounds, TelemetryMessage
 from fire_uav.core.telemetry import telemetry_sample_from_message
-from fire_uav.services.bus import Event, bus
 
 log = logging.getLogger(__name__)
 

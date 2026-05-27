@@ -8,8 +8,6 @@
 
 from __future__ import annotations
 
-import logging
-
 from fire_uav.config.logging_config import setup_logging as _setup_logging
 from fire_uav.config.settings import settings
 

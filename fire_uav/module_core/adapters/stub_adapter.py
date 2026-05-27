@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
 
 from fire_uav.core.telemetry import normalize_battery_value
 from fire_uav.module_core.adapters.interfaces import IUavAdapter, IUavTelemetryConsumer

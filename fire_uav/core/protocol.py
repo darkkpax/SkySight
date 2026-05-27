@@ -7,7 +7,7 @@ from typing import List, Literal, Union
 
 from pydantic import BaseModel
 
-from fire_uav.module_core.schema import GeoDetection, Route, TelemetrySample, Waypoint as CoreWaypoint
+from fire_uav.module_core.schema import GeoDetection, Route, TelemetrySample
 from fire_uav.utils.time import utc_now
 
 

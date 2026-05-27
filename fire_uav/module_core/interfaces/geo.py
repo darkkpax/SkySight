@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from fire_uav.module_core.schema import GeoDetection, TelemetrySample
+from fire_uav.module_core.schema import TelemetrySample
 
 
 class IGeoProjector(ABC):

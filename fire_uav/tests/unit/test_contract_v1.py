@@ -1,8 +1,6 @@
 # mypy: ignore-errors
 from __future__ import annotations
 
-from datetime import datetime
-
 import pytest
 from pydantic import ValidationError
 

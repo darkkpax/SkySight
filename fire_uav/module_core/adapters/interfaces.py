@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Awaitable, Callable, Protocol
+from typing import Protocol
 
 from fire_uav.module_core.contract.v1 import CapabilitiesV1, CommandV1, RouteV1
 from fire_uav.module_core.contract.mappers import route_v1_to_internal

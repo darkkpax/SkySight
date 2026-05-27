@@ -25,11 +25,11 @@ except ImportError:
             "PySide6 WebEngine is missing. Reinstall with Qt WebEngine support (poetry install or pip install PySide6-Addons)."
         ) from exc
 
-import fire_uav.infrastructure.providers as deps
-from fire_uav.bootstrap import init_ground_core
-from fire_uav.gui.windows.main_window import MainWindow
-from fire_uav.config.logging_config import setup_logging
-from fire_uav.ground_app.config import load_ground_settings
+import fire_uav.infrastructure.providers as deps  # noqa: E402
+from fire_uav.bootstrap import init_ground_core  # noqa: E402
+from fire_uav.gui.windows.main_window import MainWindow  # noqa: E402
+from fire_uav.config.logging_config import setup_logging  # noqa: E402
+from fire_uav.ground_app.config import load_ground_settings  # noqa: E402
 
 
 def main() -> None:  # noqa: D401

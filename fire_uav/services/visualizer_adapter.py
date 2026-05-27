@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Iterable
 
 from fire_uav.module_core.schema import GeoDetection, Route, TelemetrySample, Waypoint
 from fire_uav.services.visualizer_client import VisualizerClient

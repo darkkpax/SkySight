@@ -1,8 +1,6 @@
 # mypy: ignore-errors
 from __future__ import annotations
 
-from datetime import datetime
-
 from fastapi.testclient import TestClient
 
 import fire_uav.infrastructure.providers as deps
