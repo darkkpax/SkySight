@@ -1609,7 +1609,13 @@ ApplicationWindow {
                                 spacing: 8
 
                                 delegate: Rectangle {
+                                    id: objDelegate
                                     property bool hovered: false
+                                    property var tagInfo: root.classTagInfo(modelData.class_id)
+                                    property string distFromUav: (hasApp && app.uavStates && app.uavStates.length > 0)
+                                        ? root.distanceM(app.uavStates[0].lat, app.uavStates[0].lon, modelData.lat || 0, modelData.lon || 0)
+                                        : "--"
+
                                     width: targetsView.width
                                     radius: 16
                                     color: modelData.selected
@@ -1619,49 +1625,166 @@ ApplicationWindow {
                                                   ? Qt.rgba(0.73, 0.89, 1.0, hovered ? 0.34 : 0.22)
                                                   : Qt.rgba(1, 1, 1, hovered ? 0.14 : 0.06)
                                     border.width: 1
-                                    implicitHeight: targetInfo.implicitHeight + 20
+                                    implicitHeight: objContent.implicitHeight + 20
                                     clip: true
                                     scale: hovered ? 1.012 : 1.0
                                     Behavior on color { ColorAnimation { duration: 140; easing.type: Easing.OutQuad } }
                                     Behavior on border.color { ColorAnimation { duration: 140; easing.type: Easing.OutQuad } }
                                     Behavior on scale { SpringAnimation { spring: 5.0; damping: 0.50; mass: 0.85 } }
 
-                                    Column {
-                                        id: targetInfo
-                                        anchors.fill: parent
-                                        anchors.margins: 10
-                                        spacing: 4
-
-                                        Text {
-                                            text: modelData.object_id
-                                            color: textPrimary
-                                            font.pixelSize: 13
-                                            font.family: "Inter"
-                                            font.bold: true
-                                        }
-
-                                        Text {
-                                            text: (modelData.label || "цель") + " • достоверность " + Number(modelData.confidence || 0).toFixed(2)
-                                            color: textMuted
-                                            font.pixelSize: 11
-                                            font.family: "Inter"
-                                        }
-
-                                        Text {
-                                            text: "Шир " + Number(modelData.lat || 0).toFixed(5) + "  Долг " + Number(modelData.lon || 0).toFixed(5)
-                                            color: "#cfe2ee"
-                                            font.pixelSize: 11
-                                            font.family: "Inter"
-                                        }
-                                    }
-
                                     MouseArea {
                                         anchors.fill: parent
+                                        z: 0
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
-                                        onEntered: parent.hovered = true
-                                        onExited: parent.hovered = false
+                                        onEntered: objDelegate.hovered = true
+                                        onExited: objDelegate.hovered = false
                                         onClicked: if (hasApp) app.selectConfirmedObject(modelData.object_id)
+                                    }
+
+                                    Column {
+                                        id: objContent
+                                        anchors.fill: parent
+                                        anchors.margins: 10
+                                        spacing: 5
+                                        z: 1
+
+                                        RowLayout {
+                                            width: parent.width
+                                            spacing: 5
+
+                                            Rectangle {
+                                                radius: 6
+                                                color: Qt.rgba(1, 1, 1, 0.08)
+                                                implicitWidth: objIdText.implicitWidth + 10
+                                                implicitHeight: 20
+                                                Text {
+                                                    id: objIdText
+                                                    anchors.centerIn: parent
+                                                    text: "#" + String(modelData.object_id || "").slice(-4)
+                                                    color: textPrimary
+                                                    font.pixelSize: 11
+                                                    font.family: "Consolas"
+                                                    font.bold: true
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                radius: 6
+                                                color: objDelegate.tagInfo.fill
+                                                border.color: objDelegate.tagInfo.border
+                                                border.width: 1
+                                                implicitWidth: objTagText.implicitWidth + 12
+                                                implicitHeight: 20
+                                                Text {
+                                                    id: objTagText
+                                                    anchors.centerIn: parent
+                                                    text: objDelegate.tagInfo.icon + " " + objDelegate.tagInfo.label
+                                                    color: objDelegate.tagInfo.text
+                                                    font.pixelSize: 10
+                                                    font.family: "Inter"
+                                                    font.bold: true
+                                                }
+                                            }
+
+                                            Item { Layout.fillWidth: true }
+
+                                            Text {
+                                                text: "↗ " + objDelegate.distFromUav
+                                                color: accentStrong
+                                                font.pixelSize: 11
+                                                font.family: "Inter"
+                                                font.bold: true
+                                                visible: objDelegate.distFromUav !== "--"
+                                            }
+                                        }
+
+                                        RowLayout {
+                                            width: parent.width
+                                            spacing: 8
+                                            Text {
+                                                text: (modelData.track_id !== null && modelData.track_id !== undefined)
+                                                      ? ("Трек #" + modelData.track_id) : "Трек н/д"
+                                                color: textMuted
+                                                font.pixelSize: 10
+                                                font.family: "Inter"
+                                            }
+                                            Text {
+                                                text: root._seenAt[modelData.object_id]
+                                                      ? ("• " + root.elapsedText(root._seenAt[modelData.object_id], root._elapsedTick))
+                                                      : ""
+                                                color: textMuted
+                                                font.pixelSize: 10
+                                                font.family: "Inter"
+                                            }
+                                        }
+
+                                        RowLayout {
+                                            width: parent.width
+                                            spacing: 8
+                                            Rectangle {
+                                                Layout.fillWidth: true
+                                                implicitHeight: 4
+                                                radius: 2
+                                                color: Qt.rgba(1, 1, 1, 0.10)
+                                                Rectangle {
+                                                    width: parent.width * Math.min(1.0, Math.max(0.0, modelData.confidence || 0))
+                                                    height: parent.height
+                                                    radius: 2
+                                                    color: objDelegate.tagInfo.text
+                                                    Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutQuad } }
+                                                }
+                                            }
+                                            Text {
+                                                text: Math.round((modelData.confidence || 0) * 100) + "%"
+                                                color: objDelegate.tagInfo.text
+                                                font.pixelSize: 11
+                                                font.family: "Inter"
+                                                font.bold: true
+                                            }
+                                        }
+
+                                        Rectangle { width: parent.width; implicitHeight: 1; color: Qt.rgba(1, 1, 1, 0.07) }
+
+                                        RowLayout {
+                                            width: parent.width
+                                            spacing: 6
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: Number(modelData.lat || 0).toFixed(5) + "  " + Number(modelData.lon || 0).toFixed(5)
+                                                color: "#cfe2ee"
+                                                font.pixelSize: 10
+                                                font.family: "Consolas"
+                                                elide: Text.ElideRight
+                                            }
+                                            Rectangle {
+                                                visible: hasApp ? app.canOpenOrbit : false
+                                                implicitWidth: orbitCardBtnText.implicitWidth + 16
+                                                implicitHeight: 22
+                                                radius: 7
+                                                color: Qt.rgba(0.20, 0.48, 0.78, 0.22)
+                                                border.color: Qt.rgba(0.62, 0.84, 1.0, 0.28)
+                                                border.width: 1
+                                                Text {
+                                                    id: orbitCardBtnText
+                                                    anchors.centerIn: parent
+                                                    text: "Орбита"
+                                                    color: accent
+                                                    font.pixelSize: 10
+                                                    font.family: "Inter"
+                                                    font.bold: true
+                                                }
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        if (!hasApp) return
+                                                        app.selectConfirmedObject(modelData.object_id)
+                                                        app.orbitConfirmedObject()
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
 
