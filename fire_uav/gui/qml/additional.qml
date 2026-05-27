@@ -162,6 +162,60 @@ ApplicationWindow {
         orbitSelection = next;
     }
 
+    property var _seenAt: ({})
+    property int _elapsedTick: 0
+
+    function classTagInfo(classId) {
+        if (classId === 0) return { label: "ОГОНЬ",   icon: "🔥", fill: Qt.rgba(0.24, 0.10, 0.00, 0.72), border: Qt.rgba(1.0, 0.42, 0.18, 0.35), text: "#ff9a72" }
+        if (classId === 1) return { label: "ДЫМ",     icon: "💨", fill: Qt.rgba(0.12, 0.12, 0.18, 0.72), border: Qt.rgba(0.60, 0.60, 0.76, 0.30), text: "#c0c8d8" }
+        if (classId === 2) return { label: "ЧЕЛОВЕК", icon: "🧍", fill: Qt.rgba(0.05, 0.18, 0.08, 0.72), border: Qt.rgba(0.24, 0.72, 0.38, 0.32), text: "#90e8a8" }
+        return { label: "КЛАСС " + classId, icon: "❓", fill: Qt.rgba(0.10, 0.10, 0.10, 0.72), border: Qt.rgba(1, 1, 1, 0.14), text: "#9aa7b5" }
+    }
+
+    function distanceM(lat1, lon1, lat2, lon2) {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return "--"
+        var R = 6371000
+        var dLat = (lat2 - lat1) * Math.PI / 180
+        var dLon = (lon2 - lon1) * Math.PI / 180
+        var a = Math.sin(dLat/2)*Math.sin(dLat/2)
+              + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)
+              * Math.sin(dLon/2)*Math.sin(dLon/2)
+        var d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+        if (d < 1000) return Math.round(d) + " м"
+        return (d / 1000).toFixed(1) + " км"
+    }
+
+    function elapsedText(ms, _tick) {
+        var s = Math.floor((Date.now() - ms) / 1000)
+        if (s < 60) return s + " с"
+        if (s < 3600) return Math.floor(s / 60) + " мин"
+        return Math.floor(s / 3600) + " ч"
+    }
+
+    Timer {
+        id: elapsedRefreshTimer
+        interval: 1000
+        running: true
+        repeat: true
+        onTriggered: root._elapsedTick++
+    }
+
+    Connections {
+        target: hasApp ? app : null
+        function onConfirmedObjectsChanged() {
+            if (!hasApp) return
+            var objs = app.confirmedObjects
+            for (var i = 0; i < objs.length; i++) {
+                var oid = objs[i].object_id
+                if (root._seenAt[oid] === undefined) {
+                    var updated = Object.assign({}, root._seenAt)
+                    updated[oid] = Date.now()
+                    root._seenAt = updated
+                }
+            }
+        }
+    }
+
     onShowVideoFeedChanged: {
         if (hasApp) app.setVideoVisible(showVideoFeed);
     }
