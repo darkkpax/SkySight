@@ -668,6 +668,8 @@ class AppController(QObject):
     unrealVideoModeChanged = Signal()
     autoOrbitEnabledChanged = Signal()
     orbitRadiusMChanged = Signal()
+    orbitPointsPerCircleChanged = Signal()
+    minReturnPercentChanged = Signal()
     recoverableMissionChanged = Signal()
     orbitBatteryAdvisoryChanged = Signal()
 
@@ -686,7 +688,7 @@ class AppController(QObject):
         self._camera_switcher = camera_switcher
 
         self._logs: list[str] = []
-        self._confidence = getattr(settings, "yolo_conf", 0.25)
+        self._confidence = getattr(settings, "yolo_conf", 0.15)
         self._detector_running = False
         self._camera_available = camera_available
         self._camera_status_detail = "Camera not found"
@@ -752,14 +754,16 @@ class AppController(QObject):
         self._flight_recorder = FlightRecorder()
         self._objects_store = ConfirmedObjectsStore(on_change=self._on_objects_changed)
         self._target_tracker = TargetTracker(
-            match_radius_m=float(getattr(settings, "match_radius_m", 30.0) or 30.0),
-            suppression_radius_m=float(getattr(settings, "suppression_radius_m", 60.0) or 60.0),
+            match_radius_m=float(getattr(settings, "match_radius_m", 35.0) or 35.0),
+            suppression_radius_m=float(getattr(settings, "suppression_radius_m", 30.0) or 30.0),
             suppression_ttl_s=float(getattr(settings, "suppression_ttl_s", 180.0) or 180.0),
             stable_frames_n=int(getattr(settings, "stable_frames_n", 1) or 1),
         )
         self._known_confirmed_ids: set[str] = set()
         self._auto_orbit_enabled = bool(getattr(settings, "auto_orbit_enabled", False))
         self._orbit_radius_m = float(getattr(settings, "orbit_radius_m", 50.0) or 50.0)
+        self._orbit_points_per_circle = int(getattr(settings, "orbit_points_per_circle", 12) or 12)
+        self._min_return_percent = float(getattr(settings, "min_return_percent", 20.0) or 20.0)
         self._orbit_flow_state = OrbitFlowState.NORMAL_FLIGHT
         self._reaction_target_id: str | None = None
         self._reaction_started_monotonic = 0.0
@@ -904,7 +908,7 @@ class AppController(QObject):
                 window=window,
                 votes_required=votes_required,
                 min_confidence=float(getattr(settings, "agg_min_confidence", 0.4) or 0.4),
-                max_distance_m=float(getattr(settings, "agg_max_distance_m", 25.0) or 25.0),
+                max_distance_m=float(getattr(settings, "agg_max_distance_m", 60.0) or 60.0),
                 ttl_seconds=float(getattr(settings, "agg_ttl_seconds", 3.0) or 3.0),
             )
             self._unreal_local_pipeline = DetectionPipeline(
@@ -1036,13 +1040,17 @@ class AppController(QObject):
     def orbitRadiusM(self) -> float:
         return self._orbit_radius_m
 
-    @Property(int, notify=flightControlsChanged)
+    @Property(int, notify=orbitPointsPerCircleChanged)
+    def orbitPointsPerCircle(self) -> int:
+        return self._orbit_points_per_circle
+
+    @Property(float, notify=minReturnPercentChanged)
+    def minReturnPercent(self) -> float:
+        return self._min_return_percent
+
+    @Property(int, notify=confirmedObjectsChanged)
     def confirmedObjectCount(self) -> int:
         return self._objects_store.count()
-
-    @Property(bool, notify=flightControlsChanged)
-    def orbitAvailable(self) -> bool:
-        return self._current_action_policy().can_open_orbit
 
     @Property("QVariantList", notify=confirmedObjectsChanged)
     def confirmedObjects(self) -> list[dict[str, object]]:
@@ -1818,6 +1826,32 @@ class AppController(QObject):
         setattr(settings, "orbit_radius_m", radius)
         self.orbitRadiusMChanged.emit()
 
+    @Slot(int)
+    def setOrbitPointsPerCircle(self, value: int) -> None:
+        try:
+            pts = int(value)
+        except (TypeError, ValueError):
+            return
+        pts = max(4, min(64, pts))
+        if pts == self._orbit_points_per_circle:
+            return
+        self._orbit_points_per_circle = pts
+        setattr(settings, "orbit_points_per_circle", pts)
+        self.orbitPointsPerCircleChanged.emit()
+
+    @Slot(float)
+    def setMinReturnPercent(self, value: float) -> None:
+        try:
+            pct = float(value)
+        except (TypeError, ValueError):
+            return
+        pct = max(5.0, min(50.0, pct))
+        if abs(pct - self._min_return_percent) < 1e-6:
+            return
+        self._min_return_percent = pct
+        setattr(settings, "min_return_percent", pct)
+        self.minReturnPercentChanged.emit()
+
     @Slot(bool)
     def setVideoVisible(self, visible: bool) -> None:
         self._video_visible = bool(visible)
@@ -2194,7 +2228,6 @@ class AppController(QObject):
         self.map_bridge.render_map()
         self.planConfirmedChanged.emit()
         self.flightControlsChanged.emit()
-        self.map_bridge.render_map()
         if resume_failed:
             self.toastRequested.emit("Route sent; resume manually in Unreal")
         else:
@@ -3076,7 +3109,6 @@ class AppController(QObject):
             for index, obj in enumerate(all_objects)
         ]
         self.confirmedObjectsChanged.emit()
-        self.flightControlsChanged.emit()
         _log.info("OBJECT_CONFIRMED_UI store count=%d", self._objects_store.count())
 
     def _set_map_refresh_needed(self, needed: bool) -> None:
@@ -3537,7 +3569,6 @@ class AppController(QObject):
         self.map_bridge.render_map()
         self.planConfirmedChanged.emit()
         self.flightControlsChanged.emit()
-        self.map_bridge.render_map()
         if resume_failed:
             self.toastRequested.emit("Route sent; resume manually in Unreal")
         else:
@@ -3711,7 +3742,6 @@ class AppController(QObject):
                 ],
             )
         advisory_targets = list(preview_targets)
-        valid_targets = valid_targets[:1]
 
         base_path = self._mission.confirmed_plan or self._plan_vm.get_path()
         base_route = self._route_from_points(base_path)
@@ -3739,30 +3769,66 @@ class AppController(QObject):
         self._orbit_resume_route = base_route.model_copy(deep=True)
 
         state = self._latest_telemetry
-        target = valid_targets[0]
-        route = self._plan_vm._route_planner.plan_maneuver(
-            current_state=state,
-            target_lat=float(target.lat),
-            target_lon=float(target.lon),
-            base_route=base_route,
-            allow_unsafe=allow_unsafe,
+        planner = self._plan_vm._route_planner
+
+        # ── Multi-target smart orbit ──────────────────────────────────────
+        # If there are multiple known targets (current + queue), plan a single
+        # route that orbits all of them: tangential entry per target, early
+        # exit toward the next target after ≥200° sweep, full final orbit.
+        all_orbit_targets: list[ConfirmedObject] = list(valid_targets)
+        seen_ids: set[str] = {t.object_id for t in all_orbit_targets}
+        for _oid, _ in self._pending_orbit_queue:
+            q = self._objects_store.get(_oid)
+            if q is not None and q.object_id not in seen_ids:
+                all_orbit_targets.append(q)
+                seen_ids.add(q.object_id)
+
+        use_multi = (
+            len(all_orbit_targets) > 1
+            and hasattr(planner, "plan_multi_target_maneuver")
         )
-        unsafe_route = self._plan_vm._route_planner.plan_maneuver(
-            current_state=state,
-            target_lat=float(target.lat),
-            target_lon=float(target.lon),
-            base_route=base_route,
-            allow_unsafe=True,
-        )
+
+        if use_multi:
+            target_coords = [(float(t.lat), float(t.lon)) for t in all_orbit_targets]
+            # All targets will be in the single route; clear the queue now.
+            self._pending_orbit_queue.clear()
+            route = planner.plan_multi_target_maneuver(
+                state, target_coords, base_route, allow_unsafe=allow_unsafe
+            )
+            unsafe_route = (
+                planner.plan_multi_target_maneuver(state, target_coords, base_route, allow_unsafe=True)
+                if route is None else None
+            )
+            target = all_orbit_targets[0]
+            active_targets_for_stage = all_orbit_targets
+        else:
+            # Single target: tangential entry handled inside plan_maneuver.
+            valid_targets = valid_targets[:1]
+            target = valid_targets[0]
+            active_targets_for_stage = list(valid_targets)
+            route = planner.plan_maneuver(
+                current_state=state,
+                target_lat=float(target.lat),
+                target_lon=float(target.lon),
+                base_route=base_route,
+                allow_unsafe=allow_unsafe,
+            )
+            unsafe_route = (
+                planner.plan_maneuver(
+                    current_state=state,
+                    target_lat=float(target.lat),
+                    target_lon=float(target.lon),
+                    base_route=base_route,
+                    allow_unsafe=True,
+                )
+                if route is None else None
+            )
+
         if route is None:
             if unsafe_route is not None and not allow_unsafe:
-                queued_targets = [target]
-                for object_id, _queued_source in self._pending_orbit_queue:
-                    queued_target = self._objects_store.get(object_id)
-                    if queued_target is not None:
-                        queued_targets.append(queued_target)
+                battery_targets = list(all_orbit_targets)
                 self._show_orbit_battery_advisory(
-                    targets=queued_targets,
+                    targets=battery_targets,
                     source=source,
                     orbit_route=unsafe_route,
                     base_route=base_route,
@@ -3781,7 +3847,7 @@ class AppController(QObject):
             )
             return
         advisory_route = route
-        if len(advisory_targets) > 1:
+        if not use_multi and len(advisory_targets) > 1:
             chain_route = self._build_orbit_chain_route(
                 targets=advisory_targets,
                 current_state=state,
@@ -3790,13 +3856,9 @@ class AppController(QObject):
             if chain_route is not None:
                 advisory_route = chain_route
         if not allow_unsafe and self._orbit_requires_battery_prompt(advisory_route):
-            queued_targets = [target]
-            for object_id, _queued_source in self._pending_orbit_queue:
-                queued_target = self._objects_store.get(object_id)
-                if queued_target is not None:
-                    queued_targets.append(queued_target)
+            battery_targets = list(all_orbit_targets)
             self._show_orbit_battery_advisory(
-                targets=queued_targets,
+                targets=battery_targets,
                 source=source,
                 orbit_route=advisory_route,
                 base_route=base_route,
@@ -3807,7 +3869,7 @@ class AppController(QObject):
             route=route,
             base_route=base_route,
             target=target,
-            active_targets=valid_targets,
+            active_targets=active_targets_for_stage,
             source=source,
         )
 
@@ -4058,6 +4120,23 @@ class AppController(QObject):
         if planner is None or not hasattr(planner, "plan_maneuver"):
             return []
 
+        # Use multi-target planner for a single accurate preview when possible.
+        if len(targets) > 1 and hasattr(planner, "plan_multi_target_maneuver"):
+            try:
+                target_coords = [(float(t.lat), float(t.lon)) for t in targets]
+                route = planner.plan_multi_target_maneuver(
+                    current_state, target_coords, base_route, allow_unsafe=True
+                )
+                if route and route.waypoints:
+                    orbit_segment, _ = self._extract_orbit_segment(route, base_route)
+                    segment = orbit_segment or list(route.waypoints)
+                    coords = dedupe_path([(float(wp.lat), float(wp.lon)) for wp in segment], threshold_m=0.5)
+                    if len(coords) >= 2:
+                        return [coords]
+            except Exception:
+                _log.debug("Failed to build multi-target orbit preview", exc_info=True)
+
+        # Fallback: build per-target previews sequentially.
         preview_paths: list[list[tuple[float, float]]] = []
         simulated_state = current_state.model_copy(deep=True)
         for target in targets:

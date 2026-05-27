@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import os
 from typing import Optional
 
@@ -33,7 +34,7 @@ async def require_api_key(request: Request) -> None:
     if not expected:
         return
     provided = _normalize(request.headers.get("x-api-key") or request.headers.get("authorization"))
-    if provided != expected:
+    if provided is None or not hmac.compare_digest(provided, expected):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API token",
@@ -54,7 +55,7 @@ async def require_ws_api_key(ws: WebSocket) -> bool:
         or ws.headers.get("authorization")
         or ws.query_params.get("token")
     )
-    if provided != expected:
+    if provided is None or not hmac.compare_digest(provided, expected):
         await ws.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid API token")
         return False
     return True

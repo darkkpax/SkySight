@@ -24,6 +24,7 @@ class _Cluster:
     class_id: int
     events: Deque[DetectionEvent] = field(default_factory=deque)
     last_reported: datetime | None = None
+    last_centroid: WorldCoord | None = None
 
     def add(self, event: DetectionEvent, maxlen: int) -> None:
         self.events.append(event)
@@ -33,13 +34,21 @@ class _Cluster:
     def centroid(self) -> WorldCoord:
         lat = sum(ev.location.lat for ev in self.events) / len(self.events)
         lon = sum(ev.location.lon for ev in self.events) / len(self.events)
-        return WorldCoord(lat=lat, lon=lon)
+        c = WorldCoord(lat=lat, lon=lon)
+        self.last_centroid = c
+        return c
 
     def votes(self) -> int:
         return len({ev.frame_id for ev in self.events})
 
     def avg_conf(self) -> float:
         return sum(ev.confidence for ev in self.events) / len(self.events)
+
+    def ref_location(self) -> WorldCoord | None:
+        """Most recent known position: last event or last confirmed centroid."""
+        if self.events:
+            return self.events[-1].location
+        return self.last_centroid
 
 
 class DetectionAggregator:
@@ -95,10 +104,13 @@ class DetectionAggregator:
         closest: _Cluster | None = None
         closest_dist = float("inf")
         for cluster in self._clusters:
-            if cluster.class_id != event.class_id or not cluster.events:
+            if cluster.class_id != event.class_id:
+                continue
+            ref = cluster.ref_location()
+            if ref is None:
                 continue
             dist = haversine_m(
-                (cluster.events[-1].location.lat, cluster.events[-1].location.lon),
+                (ref.lat, ref.lon),
                 (event.location.lat, event.location.lon),
             )
             if dist <= self.max_distance_m and dist < closest_dist:
@@ -113,7 +125,7 @@ class DetectionAggregator:
     def _cleanup(self, now: datetime) -> None:
         for cluster in list(self._clusters):
             if not cluster.events:
-                if cluster.last_reported and now - cluster.last_reported > self.ttl:
+                if cluster.last_reported is None or now - cluster.last_reported > self.ttl:
                     self._clusters.remove(cluster)
                 continue
             if now - cluster.events[-1].timestamp > self.ttl:

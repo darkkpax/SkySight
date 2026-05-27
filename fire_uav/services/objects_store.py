@@ -5,7 +5,17 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Callable
 
+from fire_uav.module_core.geometry import haversine_m
 from fire_uav.services.bus import Event, bus
+
+def _get_dedup_radius() -> float:
+    from fire_uav.config.settings import settings  # late import avoids circular dependency
+    return float(getattr(settings, "ui_spatial_dedup_radius_m", 80.0) or 80.0)
+
+
+def _get_smooth_alpha() -> float:
+    from fire_uav.config.settings import settings
+    return float(getattr(settings, "bbox_smooth_alpha", 0.25) or 0.25)
 
 @dataclass(slots=True)
 class ConfirmedObject:
@@ -65,16 +75,46 @@ class ConfirmedObjectsStore:
         if not object_id:
             return
         timestamp = self._parse_timestamp(payload.get("timestamp"))
+        try:
+            lat = float(payload.get("lat", 0.0))
+            lon = float(payload.get("lon", 0.0))
+            class_id = int(payload.get("class_id", -1))
+        except (TypeError, ValueError):
+            return
         obj = ConfirmedObject(
             object_id=object_id,
-            class_id=int(payload.get("class_id", -1)),
+            class_id=class_id,
             confidence=float(payload.get("confidence", 0.0)),
-            lat=float(payload.get("lat", 0.0)),
-            lon=float(payload.get("lon", 0.0)),
+            lat=lat,
+            lon=lon,
             track_id=payload.get("track_id"),
             timestamp=timestamp,
         )
+
         is_new = object_id not in self._objects
+
+        if is_new and not object_id.startswith("manual-"):
+            # Last-resort spatial dedup: if a same-class object already exists
+            # within _SPATIAL_DEDUP_RADIUS_M, this is a duplicate — update the
+            # existing marker instead of creating a second one.
+            duplicate_id = self._find_spatial_duplicate(obj)
+            if duplicate_id is not None:
+                existing = self._objects[duplicate_id]
+                alpha = _get_smooth_alpha()
+                existing.lat = (1.0 - alpha) * existing.lat + alpha * obj.lat
+                existing.lon = (1.0 - alpha) * existing.lon + alpha * obj.lon
+                if obj.confidence > existing.confidence:
+                    existing.confidence = obj.confidence
+                log.debug(
+                    "Spatial dedup: merged %s into %s (dist=%.1fm)",
+                    object_id,
+                    duplicate_id,
+                    haversine_m((existing.lat, existing.lon), (obj.lat, obj.lon)),
+                )
+                if self._on_change:
+                    self._on_change()
+                return
+
         self._objects[object_id] = obj
         if is_new:
             self._order.append(object_id)
@@ -86,6 +126,20 @@ class ConfirmedObjectsStore:
                 )
         if self._on_change:
             self._on_change()
+
+    def _find_spatial_duplicate(self, obj: ConfirmedObject) -> str | None:
+        """Return the object_id of the closest existing same-class object within radius, or None."""
+        radius = _get_dedup_radius()
+        best_id: str | None = None
+        best_dist = float("inf")
+        for existing_id, existing in self._objects.items():
+            if existing.class_id != obj.class_id:
+                continue
+            dist = haversine_m((existing.lat, existing.lon), (obj.lat, obj.lon))
+            if dist < radius and dist < best_dist:
+                best_id = existing_id
+                best_dist = dist
+        return best_id
 
     @staticmethod
     def _parse_timestamp(value: object) -> datetime | None:

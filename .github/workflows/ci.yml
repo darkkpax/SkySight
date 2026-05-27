@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ruff
+        run: pip install "ruff>=0.6"
+
+      - name: Run ruff
+        run: ruff check fire_uav/ --output-format=github
+
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install core + dev deps
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+          # Install lightweight stubs for modules not available in CI
+          pip install pydantic numpy shapely httpx requests || true
+
+      - name: Run tests
+        run: |
+          python -m pytest tests/ -v \
+            --cov=fire_uav \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            -p no:warnings
+        env:
+          QT_QPA_PLATFORM: offscreen
+          FIRE_UAV_PROFILE: dev
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.11'
+        with:
+          file: coverage.xml
+          fail_ci_if_error: false

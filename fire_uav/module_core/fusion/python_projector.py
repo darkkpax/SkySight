@@ -146,7 +146,12 @@ class PythonGeoProjector(IGeoProjector):
             alt_source = telemetry.alt
         alt = max(float(alt_source), 0.0)
         ray_z = ray_enu[2]
-        if ray_z >= -1e-9:
+        # Reject rays pointing upward or shallower than ~3° below horizontal.
+        # A threshold of -0.05 corresponds to sin(~3°); rays closer to horizontal
+        # produce ground-intersection distances of alt/0.05 = 20×alt metres at
+        # minimum, yielding wildly inaccurate geo-projections.
+        _MIN_RAY_Z = -0.05
+        if ray_z >= _MIN_RAY_Z:
             log.debug(
                 "Projection rejected: ray does not intersect ground (ray_z=%.6f, mount_pitch=%.2f, uav_ypr=(%.2f, %.2f, %.2f))",
                 ray_z,

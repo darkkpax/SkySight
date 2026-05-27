@@ -41,6 +41,14 @@ class CameraSpec:
     focal_length_mm: float = 5.7
     fov_deg: float = 82.1
 
+    def __post_init__(self) -> None:
+        if self.sensor_width_mm <= 0:
+            raise ValueError(f"sensor_width_mm must be positive, got {self.sensor_width_mm}")
+        if self.focal_length_mm <= 0:
+            raise ValueError(f"focal_length_mm must be positive, got {self.focal_length_mm}")
+        if self.resolution_px <= 0:
+            raise ValueError(f"resolution_px must be positive, got {self.resolution_px}")
+
     def swath_m(self, alt_m: float) -> float:
         return 2 * alt_m * math.tan(math.radians(self.fov_deg / 2))
 
@@ -105,6 +113,11 @@ class FlightPlanner:
         Генерирует гребёнчатую сетку.
         Шаг задаётся в метрах, но пересчитывается в градусы.
         """
+        if self.line_spacing_m <= 0:
+            raise ValueError(
+                f"line_spacing_m must be positive (got {self.line_spacing_m}). "
+                "Check that side_overlap < 1.0 and gsd_target_cm > 0."
+            )
         rot = rotate(
             self.aoi,
             -self.grid.orientation_deg,
@@ -144,6 +157,11 @@ class FlightPlanner:
         Превращает линии в точки съёмки.
         Шаг снова переводится в градусы, чтобы «кадров» стало адекватно.
         """
+        if self.forward_spacing_m <= 0:
+            raise ValueError(
+                f"forward_spacing_m must be positive (got {self.forward_spacing_m}). "
+                "Check that front_overlap < 1.0 and gsd_target_cm > 0."
+            )
         step_deg = self.forward_spacing_m / 111_000  # ≈ град/шаг
         wps: list[Waypoint] = []
         for ln in lines:

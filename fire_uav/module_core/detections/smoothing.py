@@ -249,7 +249,7 @@ class NativeBBoxSmoother:
 
 def build_smoother(settings) -> BBoxSmoother | NativeBBoxSmoother:  # noqa: ANN001
     params = dict(
-        alpha=getattr(settings, "bbox_smooth_alpha", 0.5),
+        alpha=getattr(settings, "bbox_smooth_alpha", 0.25),
         max_center_distance_px=getattr(
             settings,
             "track_max_center_distance_px",

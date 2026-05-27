@@ -11,6 +11,12 @@ class EnergyModel:
     power_cruise_w: float = 45.0
     battery_wh: float = 27.0
 
+    def __post_init__(self) -> None:
+        if self.cruise_speed_mps <= 0:
+            raise ValueError(f"cruise_speed_mps must be positive, got {self.cruise_speed_mps}")
+        if self.battery_wh <= 0:
+            raise ValueError(f"battery_wh must be positive, got {self.battery_wh}")
+
     def cruise_time_s(self, distance_m: float) -> float:
         return distance_m / self.cruise_speed_mps
 

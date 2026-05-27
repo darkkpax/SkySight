@@ -8,7 +8,7 @@ from fire_uav.module_core.factories import get_energy_model
 from fire_uav.module_core.interfaces.energy import EnergyInsufficientError, IEnergyModel
 from fire_uav.module_core.interfaces.route_planner import IRoutePlanner
 from fire_uav.module_core.route.base_location import resolve_base_location
-from fire_uav.module_core.route.maneuvers import build_maneuver, build_rejoin
+from fire_uav.module_core.route.maneuvers import build_maneuver, build_multi_target_maneuver, build_rejoin, OrbitParams
 from fire_uav.module_core.schema import Route, TelemetrySample, Waypoint, WorldCoord
 from fire_uav.module_core.route.planner import build_route
 
@@ -77,6 +77,53 @@ class PythonRoutePlanner(IRoutePlanner):
             base_route=base_route,
             energy_model=self.energy_model,
             settings=self.settings,
+            allow_unsafe=allow_unsafe,
+        )
+
+    def plan_multi_target_maneuver(
+        self,
+        current_state: TelemetrySample,
+        targets: list[tuple[float, float]],
+        base_route: Route,
+        *,
+        allow_unsafe: bool = False,
+    ) -> Route | None:
+        raw_altitude = getattr(self.settings, "maneuver_alt_m", None)
+        try:
+            altitude = float(raw_altitude) if raw_altitude is not None else float(current_state.alt)
+        except (TypeError, ValueError):
+            altitude = float(current_state.alt)
+        altitude = max(0.0, altitude)
+        try:
+            radius = max(1.0, float(getattr(self.settings, "orbit_radius_m", 50.0) or 50.0))
+        except (TypeError, ValueError):
+            radius = 50.0
+        try:
+            points_per_circle = max(3, int(getattr(self.settings, "orbit_points_per_circle", 12) or 12))
+        except (TypeError, ValueError):
+            points_per_circle = 12
+        try:
+            loops = max(1, int(getattr(self.settings, "orbit_loops", 1) or 1))
+        except (TypeError, ValueError):
+            loops = 1
+        orbit_params = OrbitParams(
+            radius_m=radius,
+            altitude_m=altitude,
+            points_per_circle=points_per_circle,
+            loops=loops,
+        )
+        from fire_uav.module_core.route.base_location import resolve_base_location
+        base_location = resolve_base_location(self.settings, base_route, current_state)
+        if base_location is None:
+            from fire_uav.module_core.schema import WorldCoord
+            base_location = WorldCoord(lat=float(current_state.lat), lon=float(current_state.lon))
+        return build_multi_target_maneuver(
+            current_state=current_state,
+            targets=targets,
+            base_route=base_route,
+            base_location=base_location,
+            energy_model=self.energy_model,
+            orbit_params=orbit_params,
             allow_unsafe=allow_unsafe,
         )
 

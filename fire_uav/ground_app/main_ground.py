@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 
@@ -10,6 +11,8 @@ os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
 
 import PySide6.QtWebEngineQuick  # noqa: F401  # registers QML types
 from PySide6.QtGui import QGuiApplication
+
+logger = logging.getLogger(__name__)
 
 # QtWebEngine module name differs between PySide6 builds.
 try:
@@ -32,22 +35,33 @@ from fire_uav.ground_app.config import load_ground_settings
 def main() -> None:  # noqa: D401
     cfg = load_ground_settings()
     setup_logging(cfg)
+    logger.info("Ground station starting...")
+    
     init_ground_core()  # создаёт очереди, lifecycle, bus-binding
+    logger.info("Core initialized")
 
     QtWebEngine.initialize()
+    logger.info("QtWebEngine initialized")
+    
     app = QGuiApplication(sys.argv)
+    logger.info("QGuiApplication created")
 
     # Ensure background threads stop when window closes to avoid Qt aborts.
     app.aboutToQuit.connect(lambda: deps.get_lifecycle().stop_all())  # type: ignore[arg-type]
     win = MainWindow(qml_file="additional.qml")
+    logger.info("MainWindow created with additional.qml")
+    
     app.aboutToQuit.connect(lambda: win.stop_services())  # type: ignore[arg-type]
 
     # регистрируем только реально существующие компоненты
     for comp in (getattr(win, "cam_thr", None), getattr(win, "det_thr", None)):
         if comp is not None:
             deps.get_lifecycle().register(comp)
+            logger.debug(f"Registered component: {comp}")
 
+    logger.info("Showing window...")
     win.show()
+    logger.info("Ground station running")
     sys.exit(app.exec())
 
 

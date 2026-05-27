@@ -84,7 +84,7 @@ class DetectionPipeline:
         self._smoother = build_smoother(settings)
         self._registry = ObjectRegistry(
             spatial_match_radius_m=float(
-                getattr(settings, "object_registry_match_radius_m", 90.0) or 90.0
+                getattr(settings, "object_registry_match_radius_m", 80.0) or 80.0
             )
         )
         notifications_dir = Path(getattr(settings, "notifications_dir", "data/notifications"))
@@ -165,8 +165,12 @@ class DetectionPipeline:
     ) -> list[DetectionEvent]:
         if not projected_events:
             return []
-        merge_px = float(getattr(settings, "dedup_bbox_center_distance_px", 72.0) or 72.0)
-        merge_geo_m = float(getattr(settings, "dedup_geo_distance_m", 45.0) or 45.0)
+        # Geo-only dedup: if two detections of the same class project within
+        # merge_geo_m of each other they represent the same real-world object,
+        # regardless of where their bboxes fall in the image.
+        # The previous pixel-distance prerequisite caused misses when the same
+        # fire appeared at different image positions (large fire, camera drift).
+        merge_geo_m = float(getattr(settings, "dedup_geo_distance_m", 80.0) or 80.0)
         kept: list[tuple[DetectionEvent, tuple[float, float, float, float]]] = []
         for event, bbox in sorted(
             projected_events,
@@ -174,10 +178,8 @@ class DetectionPipeline:
             reverse=True,
         ):
             duplicate = False
-            for prev_event, prev_bbox in kept:
+            for prev_event, _prev_bbox in kept:
                 if prev_event.class_id != event.class_id:
-                    continue
-                if self._bbox_center_distance_px(prev_bbox, bbox) > merge_px:
                     continue
                 dist_m = haversine_m(
                     (prev_event.location.lat, prev_event.location.lon),

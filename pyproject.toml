@@ -42,6 +42,7 @@ ground = [
 ]
 dev = [
     "pytest>=8.2",
+    "pytest-cov>=6.0",
     "ruff>=0.6",
     "mypy>=1.16",
 ]

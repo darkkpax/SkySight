@@ -31,13 +31,14 @@ class DetectorVM(QObject):
 
     def __init__(self) -> None:
         super().__init__()
-        self._conf = getattr(settings, "yolo_conf", 0.25)
+        self._conf = getattr(settings, "yolo_conf", 0.15)
         self._frame_idx = 0
         self._tracks: list[dict[str, Any]] = []
-        self._win = getattr(settings, "agg_window", 5)
-        self._votes = getattr(settings, "agg_votes_required", 3)
-        self._min_conf = getattr(settings, "agg_min_confidence", 0.6)
-        self._smooth_alpha = float(getattr(settings, "bbox_smooth_alpha", 0.5) or 0.5)
+        self._win = getattr(settings, "agg_window", 3)
+        self._votes = getattr(settings, "agg_votes_required", 1)
+        self._min_conf = getattr(settings, "agg_min_confidence", 0.4)
+        self._smooth_alpha = float(getattr(settings, "bbox_smooth_alpha", 0.25) or 0.25)
+        self._iou_threshold = float(getattr(settings, "track_iou_threshold", 0.25))
         self._last_stable_conf: float = 0.0
         self._last_stable_count: int = 0
         # mypy ����>�?��'�?�? �?�� �?��?�?�?�����?��?��� �'����� ��?�>�+�?��� �?" ���?�?���?�>�?��?
@@ -181,7 +182,7 @@ class DetectorVM(QObject):
             if iou > best_iou:
                 best_iou = iou
                 best_idx = idx
-        return best_idx if best_iou >= 0.3 else None
+        return best_idx if best_iou >= self._iou_threshold else None
 
     @staticmethod
     def _iou(box_a: BBox, box_b: tuple[float, float, float, float]) -> float:

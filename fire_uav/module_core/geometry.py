@@ -24,7 +24,10 @@ def haversine_m(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
 
 def offset_latlon(lat: float, lon: float, dx_m: float, dy_m: float) -> Tuple[float, float]:
     d_lat = dy_m / EARTH_RADIUS_M
-    d_lon = dx_m / (EARTH_RADIUS_M * math.cos(math.radians(lat)))
+    cos_lat = math.cos(math.radians(lat))
+    # Guard against near-pole singularity (|lat| > ~89.9°) where cos → 0.
+    cos_lat = math.copysign(max(abs(cos_lat), 1e-9), cos_lat) if cos_lat != 0 else 1e-9
+    d_lon = dx_m / (EARTH_RADIUS_M * cos_lat)
     return lat + math.degrees(d_lat), lon + math.degrees(d_lon)
 
 

@@ -1,0 +1,65 @@
+<style>
+  .screen { background: #0d0d0d; border-radius: 16px; padding: 20px; font-family: Inter, sans-serif; }
+  .panel { background: #151515; border: 1px solid rgba(255,255,255,0.10); border-radius: 20px; padding: 14px 18px; }
+  .chip-row { display: flex; gap: 10px; }
+  .chip { background: #1c1c1c; border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 6px 14px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .chip.stretch { flex: 1; }
+  .chip-label { color: #9aa7b5; font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; white-space: nowrap; }
+  .chip-value { color: #edf3f7; font-size: 15px; font-weight: 700; }
+  .chip-value.ok { color: #8fe9ad; }
+  .chip-value.warn { color: #ff9a86; }
+  .chip-value.blue { color: #7bc6ff; }
+  .tag { display: inline-block; background: rgba(255,255,255,0.06); color: #9aa7b5; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; }
+  .label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+</style>
+
+<h2>Верхняя панель: как растянуть капсулы?</h2>
+<p class="subtitle">Сейчас все 8 чипов прибиты к левому краю. Два подхода к растяжке.</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Равномерно на всю ширину</h3>
+      <p>Каждый чип растягивается пропорционально, занимая одинаковое место. Аккуратно, симметрично.</p>
+      <div class="screen" style="margin-top:12px">
+        <div class="panel">
+          <div class="chip-row">
+            <div class="chip stretch"><span class="chip-label">БПЛА</span><span class="chip-value">UAV-1</span></div>
+            <div class="chip stretch"><span class="chip-label">СТАТУС</span><span class="chip-value">В ПОЛЕТЕ</span></div>
+            <div class="chip stretch"><span class="chip-label">БАТАРЕЯ</span><span class="chip-value warn">42%</span></div>
+            <div class="chip stretch"><span class="chip-label">ВЫС</span><span class="chip-value">85 м</span></div>
+            <div class="chip stretch"><span class="chip-label">GPS</span><span class="chip-value">Fix3D</span></div>
+            <div class="chip stretch"><span class="chip-label">СВЯЗЬ</span><span class="chip-value ok">НОРМА</span></div>
+            <div class="chip stretch"><span class="chip-label">БЭКЕНД</span><span class="chip-value blue">unreal</span></div>
+            <div class="chip stretch"><span class="chip-label">ВРЕМЯ</span><span class="chip-value">14:22:07</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Группы: важные шире + ВРЕМЯ справа</h3>
+      <p>СТАТУС и БАТАРЕЯ чуть шире (flex: 1.4), технические (GPS, БЭКЕНД) уже, ВРЕМЯ прибит к правому краю.</p>
+      <div class="screen" style="margin-top:12px">
+        <div class="panel">
+          <div class="chip-row">
+            <div class="chip" style="flex:1"><span class="chip-label">БПЛА</span><span class="chip-value">UAV-1</span></div>
+            <div class="chip" style="flex:1.4"><span class="chip-label">СТАТУС</span><span class="chip-value">В ПОЛЕТЕ</span></div>
+            <div class="chip" style="flex:1.4"><span class="chip-label">БАТАРЕЯ</span><span class="chip-value warn">42%</span></div>
+            <div class="chip" style="flex:1"><span class="chip-label">ВЫС</span><span class="chip-value">85 м</span></div>
+            <div class="chip" style="flex:0.8"><span class="chip-label">GPS</span><span class="chip-value">Fix3D</span></div>
+            <div class="chip" style="flex:1.2"><span class="chip-label">СВЯЗЬ</span><span class="chip-value ok">НОРМА</span></div>
+            <div class="chip" style="flex:1"><span class="chip-label">БЭКЕНД</span><span class="chip-value blue">unreal</span></div>
+            <div class="chip" style="flex:1; margin-left:auto"><span class="chip-label">ВРЕМЯ</span><span class="chip-value">14:22:07</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

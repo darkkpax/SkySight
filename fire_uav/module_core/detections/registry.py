@@ -24,8 +24,11 @@ class TrackedObjectState:
     notified: bool = False
 
 
+_POSITION_SMOOTH_ALPHA: float = 0.25  # weight given to newest detection vs stored position
+
+
 class ObjectRegistry:
-    def __init__(self, *, spatial_match_radius_m: float = 90.0) -> None:
+    def __init__(self, *, spatial_match_radius_m: float = 80.0) -> None:
         self._objects: Dict[str, TrackedObjectState] = {}
         self._by_track: Dict[Tuple[int, int], str] = {}
         self._counter: int = 0
@@ -88,11 +91,11 @@ class ObjectRegistry:
                 self._by_track[(track_id, detection.class_id)] = state.object_id
             return state
 
-        # Update existing
+        # Update existing — smooth position to reduce projection noise.
         state.last_seen = detection.timestamp
         state.confidence = max(state.confidence, detection.confidence)
-        state.lat = detection.lat
-        state.lon = detection.lon
+        state.lat = (1.0 - _POSITION_SMOOTH_ALPHA) * state.lat + _POSITION_SMOOTH_ALPHA * detection.lat
+        state.lon = (1.0 - _POSITION_SMOOTH_ALPHA) * state.lon + _POSITION_SMOOTH_ALPHA * detection.lon
         state.alt = detection.alt
         if detection.frame_id:
             state.frames.append(detection.frame_id)

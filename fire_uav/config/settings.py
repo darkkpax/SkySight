@@ -84,9 +84,10 @@ class Settings:
     agg_max_distance_m: float = 60.0
     agg_ttl_seconds: float = 8.0
     dedup_bbox_center_distance_px: float = 120.0
-    dedup_geo_distance_m: float = 45.0
+    dedup_geo_distance_m: float = 80.0
     match_radius_m: float = 35.0
-    object_registry_match_radius_m: float = 45.0
+    object_registry_match_radius_m: float = 80.0
+    ui_spatial_dedup_radius_m: float = 80.0
     suppression_radius_m: float = 30.0
     suppression_ttl_s: float = 180.0
     stable_frames_n: int = 1
@@ -235,6 +236,9 @@ class Settings:
             match_radius_m=float(data.get("match_radius_m", defaults.match_radius_m)),
             object_registry_match_radius_m=float(
                 data.get("object_registry_match_radius_m", defaults.object_registry_match_radius_m)
+            ),
+            ui_spatial_dedup_radius_m=float(
+                data.get("ui_spatial_dedup_radius_m", defaults.ui_spatial_dedup_radius_m)
             ),
             suppression_radius_m=float(
                 data.get("suppression_radius_m", defaults.suppression_radius_m)

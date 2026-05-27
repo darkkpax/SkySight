@@ -1,0 +1,119 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Pre-release tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        run: python -m pytest tests/ -q -p no:warnings
+        env:
+          QT_QPA_PLATFORM: offscreen
+          FIRE_UAV_PROFILE: dev
+
+  build-wheel:
+    name: Build wheel
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build wheel
+        run: |
+          pip install build
+          python -m build --wheel --outdir dist/
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel
+          path: dist/*.whl
+
+  build-exe-windows:
+    name: Build Windows executable
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps + PyInstaller
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[ground,detect,dev]"
+          pip install pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller `
+            --onefile `
+            --windowed `
+            --name fire-uav-ground `
+            --add-data "fire_uav/gui/qml;fire_uav/gui/qml" `
+            --add-data "fire_uav/config/settings_default.json;fire_uav/config" `
+            --hidden-import fire_uav.infrastructure.providers `
+            --hidden-import fire_uav.bootstrap `
+            fire_uav/ground_app/main_ground.py
+
+      - name: Upload exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: dist/fire-uav-ground.exe
+
+  publish-release:
+    name: Create GitHub Release
+    needs: [build-wheel, build-exe-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: wheel
+          path: dist/
+
+      - name: Download Windows exe
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-exe
+          path: dist/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.whl
+            dist/*.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}

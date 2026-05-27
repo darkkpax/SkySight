@@ -47,6 +47,51 @@ def build_orbit(
     return result
 
 
+_MIN_ORBIT_ARC_DEG: float = 200.0  # minimum sweep before switching to next target
+
+
+def _nearest_entry_angle_rad(
+    current_lat: float,
+    current_lon: float,
+    target_lat: float,
+    target_lon: float,
+) -> float:
+    """
+    Angle (radians, ENU: East=0, CCW+) for the orbit point closest to the UAV.
+    Choosing this as the entry angle means the approach line goes directly to the
+    near side of the orbit circle instead of passing through the target zone.
+    """
+    dx = (current_lon - target_lon) * 111_320.0 * math.cos(math.radians(target_lat))
+    dy = (current_lat - target_lat) * 111_320.0
+    if dx * dx + dy * dy < 1.0:
+        return 0.0  # UAV is at target centre; use default East entry
+    return math.atan2(dy, dx)
+
+
+def _exit_angle_for_next_target(
+    target_lat: float,
+    target_lon: float,
+    next_lat: float,
+    next_lon: float,
+    entry_angle_rad: float,
+    min_arc_deg: float = _MIN_ORBIT_ARC_DEG,
+) -> float:
+    """
+    Exit angle (radians, CCW from entry_angle_rad) for transitioning to the next target.
+    Ensures at least min_arc_deg of orbit is covered, then exits toward the next target.
+    """
+    dx = (next_lon - target_lon) * 111_320.0 * math.cos(math.radians(target_lat))
+    dy = (next_lat - target_lat) * 111_320.0
+    if dx * dx + dy * dy < 1.0:
+        return entry_angle_rad + 2 * math.pi
+    ideal_exit_rad = math.atan2(dy, dx)
+    min_arc_rad = math.radians(min_arc_deg)
+    delta = (ideal_exit_rad - entry_angle_rad) % (2 * math.pi)
+    if delta < min_arc_rad:
+        delta = min_arc_rad
+    return entry_angle_rad + delta
+
+
 def _build_orbit_arc(
     target_lat: float,
     target_lon: float,
@@ -54,12 +99,13 @@ def _build_orbit_arc(
     altitude_m: float,
     points_per_circle: int,
     total_angle_deg: float,
+    start_angle_rad: float = 0.0,
 ) -> List[Waypoint]:
-    steps = max(3, int(points_per_circle * max(0.1, total_angle_deg / 360.0)))
+    steps = max(3, int(points_per_circle * max(0.1, abs(total_angle_deg) / 360.0)))
     total_angle_rad = math.radians(max(0.0, total_angle_deg))
     result: List[Waypoint] = []
     for i in range(steps + 1):
-        angle = total_angle_rad * (i / steps)
+        angle = start_angle_rad + total_angle_rad * (i / steps)
         dx = radius_m * math.cos(angle)
         dy = radius_m * math.sin(angle)
         lat, lon = offset_latlon(target_lat, target_lon, dx, dy)
@@ -160,14 +206,24 @@ def build_energy_aware_orbit(
     energy_model: IEnergyModel,
     orbit_params: OrbitParams,
     allow_unsafe: bool = False,
+    start_angle_rad: float | None = None,
 ) -> Route | None:
+    # Tangential entry: approach goes to the orbit point nearest the UAV,
+    # so the approach line never passes through the target zone.
+    if start_angle_rad is None:
+        start_angle_rad = _nearest_entry_angle_rad(
+            float(current_state.lat), float(current_state.lon),
+            target_lat, target_lon,
+        )
+    total_angle_deg = 360.0 * max(1, orbit_params.loops)
     preview_orbit = _build_orbit_arc(
         target_lat,
         target_lon,
         orbit_params.radius_m,
         orbit_params.altitude_m,
         orbit_params.points_per_circle,
-        360.0 * max(1, orbit_params.loops),
+        total_angle_deg,
+        start_angle_rad=start_angle_rad,
     )
     entry_wp = preview_orbit[0] if preview_orbit else Waypoint(
         lat=target_lat,
@@ -194,7 +250,6 @@ def build_energy_aware_orbit(
             log.warning("EnergyModel: orbit feasibility failed; allowing maneuver (%s)", exc)
             return True
 
-    total_angle_deg = 360.0 * max(1, orbit_params.loops)
     orbit = _build_orbit_arc(
         target_lat,
         target_lon,
@@ -202,6 +257,7 @@ def build_energy_aware_orbit(
         orbit_params.altitude_m,
         orbit_params.points_per_circle,
         total_angle_deg,
+        start_angle_rad=start_angle_rad,
     )
     route = _assemble_route(orbit)
     if _is_feasible(route):
@@ -224,6 +280,7 @@ def build_energy_aware_orbit(
                 orbit_params.altitude_m,
                 orbit_params.points_per_circle,
                 angle,
+                start_angle_rad=start_angle_rad,
             )
             candidate = _assemble_route(orbit)
             if _is_feasible(candidate):
@@ -287,11 +344,103 @@ def build_maneuver(
     )
 
 
+def build_multi_target_maneuver(
+    *,
+    current_state: TelemetrySample,
+    targets: List[tuple[float, float]],
+    base_route: Route,
+    base_location: WorldCoord,
+    energy_model: IEnergyModel,
+    orbit_params: OrbitParams,
+    allow_unsafe: bool = False,
+) -> Route | None:
+    """
+    Plan a single route that orbits every target efficiently.
+
+    Single target → equivalent to build_energy_aware_orbit with tangential entry.
+
+    Multiple targets:
+    - For each non-final target: tangential entry, sweep at least _MIN_ORBIT_ARC_DEG,
+      then exit at the orbit point facing the next target.
+    - For the final target: full orbit (360° × loops), then rejoin the mission route.
+    """
+    if not targets:
+        return None
+    if len(targets) == 1:
+        lat, lon = targets[0]
+        return build_energy_aware_orbit(
+            current_state=current_state,
+            target_lat=lat,
+            target_lon=lon,
+            base_route=base_route,
+            base_location=base_location,
+            energy_model=energy_model,
+            orbit_params=orbit_params,
+            allow_unsafe=allow_unsafe,
+        )
+
+    all_waypoints: list[Waypoint] = []
+    cur_lat = float(current_state.lat)
+    cur_lon = float(current_state.lon)
+
+    for i, (target_lat, target_lon) in enumerate(targets):
+        is_last = (i == len(targets) - 1)
+
+        entry_angle = _nearest_entry_angle_rad(cur_lat, cur_lon, target_lat, target_lon)
+
+        if is_last:
+            total_angle_deg = 360.0 * max(1, orbit_params.loops)
+        else:
+            next_lat, next_lon = targets[i + 1]
+            exit_angle_rad = _exit_angle_for_next_target(
+                target_lat, target_lon, next_lat, next_lon, entry_angle
+            )
+            total_angle_deg = math.degrees(exit_angle_rad - entry_angle)
+
+        arc = _build_orbit_arc(
+            target_lat, target_lon,
+            orbit_params.radius_m, orbit_params.altitude_m,
+            orbit_params.points_per_circle, total_angle_deg,
+            start_angle_rad=entry_angle,
+        )
+        if not arc:
+            continue
+
+        if i == 0:
+            approach = build_approach(current_state, arc[0])
+            all_waypoints.extend(approach)
+        else:
+            # Direct transition: previous exit → this orbit entry
+            entry_wp = arc[0]
+            if all_waypoints and haversine_m(
+                (float(all_waypoints[-1].lat), float(all_waypoints[-1].lon)),
+                (entry_wp.lat, entry_wp.lon),
+            ) > 0.5:
+                all_waypoints.append(entry_wp)
+
+        all_waypoints.extend(arc)
+        exit_wp = arc[-1]
+        cur_lat, cur_lon = float(exit_wp.lat), float(exit_wp.lon)
+
+    if not all_waypoints:
+        return None
+
+    rejoin = build_rejoin(all_waypoints[-1], base_route)
+    all_waypoints.extend(rejoin)
+
+    return Route(
+        version=base_route.version if base_route.version is not None else 1,
+        waypoints=all_waypoints,
+        active_index=0,
+    )
+
+
 __all__ = [
     "build_orbit",
     "build_approach",
     "build_rejoin",
     "build_energy_aware_orbit",
+    "build_multi_target_maneuver",
     "build_maneuver",
     "OrbitParams",
 ]
