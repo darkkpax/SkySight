@@ -804,7 +804,7 @@ ApplicationWindow {
                                         accentButton: true
                                         enabled: hasApp ? (app.canOpenOrbit && app.confirmedObjectCount > 1) : false
                                         action: function() {
-                                            if (!hasApp) return
+                                            if (!hasApp || !app.confirmedObjects) return
                                             var ids = []
                                             var objects = app.confirmedObjects
                                             for (var i = 0; i < objects.length; i++) ids.push(objects[i].object_id)
@@ -866,6 +866,7 @@ ApplicationWindow {
                                 GlassButton {
                                     Layout.fillWidth: true; implicitHeight: 42; label: "Назад к планированию"
                                     accentButton: true
+                                    enabled: hasApp
                                     action: function() { if (hasApp) app.backToPlanning() }
                                 }
                             }
@@ -1644,7 +1645,9 @@ ApplicationWindow {
 
                                     Column {
                                         id: objContent
-                                        anchors.fill: parent
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.top: parent.top
                                         anchors.margins: 10
                                         spacing: 5
                                         z: 1
