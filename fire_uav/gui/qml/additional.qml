@@ -739,57 +739,149 @@ ApplicationWindow {
                                 font.bold: true
                             }
 
-                            GridLayout {
+                            Text {
                                 Layout.fillWidth: true
-                                columns: 2
-                                columnSpacing: 8
-                                rowSpacing: 8
+                                text: {
+                                    if (!hasApp) return "Ожидание подключения"
+                                    if (isPreflight || isReady) return "Постройте маршрут и подтвердите план"
+                                    if (isInFlight) return "Дрон в воздухе — выберите цель или инициируйте возврат"
+                                    if (isRtl) return "Возврат на базу..."
+                                    if (isPostflight) return "Миссия завершена"
+                                    return ""
+                                }
+                                color: textMuted
+                                font.pixelSize: 11
+                                font.family: "Inter"
+                                wrapMode: Text.WordWrap
+                            }
 
-                                GlassButton { Layout.fillWidth: true; implicitHeight: 38; label: "Детектор"; action: function() { if (hasApp) app.startDetector(); } }
-                                GlassButton { Layout.fillWidth: true; implicitHeight: 38; label: "Сохранить"; action: function() { if (hasApp) app.savePlan(); } }
+                            // PREFLIGHT / READY
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                visible: isPreflight || isReady
+                                spacing: 8
 
                                 GlassButton {
                                     Layout.fillWidth: true
-                                    implicitHeight: 38
-                                    label: "Маршрут"
-                                    action: function() { root.routePanelMode = "edit"; }
+                                    implicitHeight: 42
+                                    label: "Подтвердить"
+                                    accentButton: true
+                                    enabled: hasApp ? app.canConfirmPlan : false
+                                    action: function() { root.requestConfirmPlan() }
                                 }
-                                GlassButton { Layout.fillWidth: true; implicitHeight: 38; label: "Подтвердить"; accentButton: true; enabled: hasApp ? app.canConfirmPlan : false; action: function() { root.requestConfirmPlan(); } }
-
-                                GlassButton { Layout.fillWidth: true; implicitHeight: 38; label: "Орбита"; enabled: hasApp ? app.canOpenOrbit : false; action: function() { root.requestOrbit(); } }
-                                GlassButton { Layout.fillWidth: true; implicitHeight: 38; label: "Возврат"; warningButton: true; enabled: hasApp ? app.canRtl : false; action: function() { if (hasApp) app.returnToHome(); } }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    GlassButton {
+                                        Layout.fillWidth: true; implicitHeight: 38; label: "Маршрут"
+                                        action: function() { root.routePanelMode = "edit" }
+                                    }
+                                    GlassButton {
+                                        Layout.fillWidth: true; implicitHeight: 38; label: "Орбита"
+                                        enabled: hasApp ? app.canOpenOrbit : false
+                                        action: function() { root.requestOrbit() }
+                                    }
+                                }
                             }
 
+                            // IN_FLIGHT
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                visible: isInFlight
+                                spacing: 8
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    GlassButton {
+                                        Layout.fillWidth: true; implicitHeight: 38; label: "Орбита"
+                                        accentButton: true
+                                        enabled: hasApp ? app.canOpenOrbit : false
+                                        action: function() { root.requestOrbit() }
+                                    }
+                                    GlassButton {
+                                        Layout.fillWidth: true; implicitHeight: 38; label: "Орбита всех"
+                                        accentButton: true
+                                        enabled: hasApp ? (app.canOpenOrbit && app.confirmedObjectCount > 1) : false
+                                        action: function() {
+                                            if (!hasApp) return
+                                            var ids = []
+                                            var objects = app.confirmedObjects
+                                            for (var i = 0; i < objects.length; i++) ids.push(objects[i].object_id)
+                                            app.orbitSelectedObjects(ids)
+                                        }
+                                    }
+                                }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    GlassButton {
+                                        Layout.fillWidth: true; implicitHeight: 38; label: "Возврат"
+                                        warningButton: true
+                                        enabled: hasApp ? app.canRtl : false
+                                        action: function() { if (hasApp) app.returnToHome() }
+                                    }
+                                    GlassButton {
+                                        Layout.fillWidth: true; implicitHeight: 38; label: "Маршрут RTL"
+                                        enabled: hasApp ? app.canSendRtlRoute : false
+                                        action: function() { if (hasApp) app.sendRtlRoute() }
+                                    }
+                                }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    GlassButton {
+                                        Layout.fillWidth: true; implicitHeight: 38; label: "Посадка"
+                                        enabled: hasApp ? app.canCompleteLanding : false
+                                        action: function() { if (hasApp) app.completeLanding() }
+                                    }
+                                    GlassButton {
+                                        Layout.fillWidth: true; implicitHeight: 38; label: "Прервать"
+                                        enabled: hasApp ? app.canAbortToPreflight : false
+                                        action: function() { if (hasApp) app.abortToPreflight() }
+                                    }
+                                }
+                            }
+
+                            // RTL
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                visible: isRtl
+                                spacing: 8
+
+                                GlassButton {
+                                    Layout.fillWidth: true; implicitHeight: 38; label: "Посадка"
+                                    accentButton: true
+                                    enabled: hasApp ? app.canCompleteLanding : false
+                                    action: function() { if (hasApp) app.completeLanding() }
+                                }
+                            }
+
+                            // POSTFLIGHT
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                visible: isPostflight
+                                spacing: 8
+
+                                GlassButton {
+                                    Layout.fillWidth: true; implicitHeight: 42; label: "Назад к планированию"
+                                    accentButton: true
+                                    action: function() { if (hasApp) app.backToPlanning() }
+                                }
+                            }
+
+                            // Утилиты — всегда видны
+                            Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Qt.rgba(1, 1, 1, 0.08) }
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: 8
-
-                                CompactComboBox {
-                                    id: quickActionCombo
-                                    Layout.fillWidth: true
-                                    model: [
-                                        "Орбита всех", "Отправить маршрут RTL", "Посадка",
-                                        "Предполет", "Назад к планированию"
-                                    ]
-                                }
-
                                 GlassButton {
-                                    implicitHeight: 38
-                                    implicitWidth: 104
-                                    label: "Выполнить"
-                                    action: function() {
-                                        if (!hasApp) return;
-                                        var action = quickActionCombo.currentText;
-                                        if (action === "Орбита всех" && app.canOpenOrbit && app.confirmedObjectCount > 1) {
-                                            var ids = [];
-                                            var objects = app.confirmedObjects;
-                                            for (var i = 0; i < objects.length; i++) ids.push(objects[i].object_id);
-                                            app.orbitSelectedObjects(ids);
-                                        } else if (action === "Отправить маршрут RTL" && app.canSendRtlRoute) app.sendRtlRoute();
-                                        else if (action === "Посадка" && app.canCompleteLanding) app.completeLanding();
-                                        else if (action === "Предполет" && app.canAbortToPreflight) app.abortToPreflight();
-                                        else if (action === "Назад к планированию" && isPostflight) app.backToPlanning();
-                                    }
+                                    Layout.fillWidth: true; implicitHeight: 34; label: "Детектор"; px: 11
+                                    action: function() { if (hasApp) app.startDetector() }
+                                }
+                                GlassButton {
+                                    Layout.fillWidth: true; implicitHeight: 34; label: "Сохранить"; px: 11
+                                    action: function() { if (hasApp) app.savePlan() }
                                 }
                             }
                         }
