@@ -594,55 +594,61 @@ ApplicationWindow {
                     spacing: 10
 
                     StatChip {
+                        Layout.fillWidth: true
                         chipLabel: "БПЛА"
                         chipValue: root.currentUavLabel()
                         valueColor: textPrimary
                     }
 
                     StatChip {
+                        Layout.fillWidth: true
                         chipLabel: "СТАТУС"
                         chipValue: hasApp ? root.missionStateRu(app.missionState) : "--"
                         valueColor: root.missionTone()
                     }
 
                     StatChip {
+                        Layout.fillWidth: true
                         chipLabel: "БАТАРЕЯ"
                         chipValue: hasApp ? app.currentBatteryText.replace("Battery: ", "") : "--"
                         valueColor: hasApp && app.routeBatteryWarning ? "#ff9a86" : textPrimary
                     }
 
                     StatChip {
+                        Layout.fillWidth: true
                         chipLabel: "ВЫС"
                         chipValue: hasApp ? app.currentAltitudeText : "--"
                         valueColor: textPrimary
                     }
 
                     StatChip {
+                        Layout.fillWidth: true
                         chipLabel: "GPS"
                         chipValue: hasApp ? app.currentGpsText : "--"
                         valueColor: textPrimary
                     }
 
                     StatChip {
+                        Layout.fillWidth: true
                         chipLabel: "СВЯЗЬ"
                         chipValue: hasApp ? root.linkStatusRu(app.currentLinkText) : "--"
                         valueColor: hasApp && app.currentLinkText === "OK" ? "#8fe9ad" : textPrimary
                     }
 
                     StatChip {
+                        Layout.fillWidth: true
                         chipLabel: "БЭКЕНД"
                         chipValue: hasApp ? app.currentBackendText : "--"
                         valueColor: accent
                     }
 
                     StatChip {
+                        Layout.fillWidth: true
                         chipLabel: "ВРЕМЯ"
                         chipValue: hasApp ? app.currentTimeText : root.currentTimeText
                         valueColor: textPrimary
                     }
                 }
-
-                Item { Layout.fillWidth: false; Layout.preferredWidth: 1; Layout.fillHeight: true }
             }
         }
 
@@ -822,6 +828,8 @@ ApplicationWindow {
                             anchors.margins: 12
                             spacing: 10
 
+                            property bool orbitParamsExpanded: false
+
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: 8
@@ -835,6 +843,33 @@ ApplicationWindow {
                                     font.pixelSize: 16
                                     font.family: "Inter"
                                     font.bold: true
+                                }
+
+                                Rectangle {
+                                    Layout.preferredWidth: orbitToggleText.implicitWidth + 16
+                                    Layout.preferredHeight: 26
+                                    radius: height / 2
+                                    color: routeColumn.orbitParamsExpanded ? Qt.rgba(0.28, 0.42, 0.18, 0.46) : Qt.rgba(1, 1, 1, 0.06)
+                                    border.color: routeColumn.orbitParamsExpanded ? Qt.rgba(0.55, 0.95, 0.38, 0.30) : Qt.rgba(1, 1, 1, 0.10)
+                                    border.width: 1
+                                    visible: routePanelMode === "view"
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                    Text {
+                                        id: orbitToggleText
+                                        anchors.centerIn: parent
+                                        text: routeColumn.orbitParamsExpanded ? "ОРБИТА ▲" : "ОРБИТА ▼"
+                                        color: routeColumn.orbitParamsExpanded ? "#a8e890" : textMuted
+                                        font.pixelSize: 10
+                                        font.family: "Inter"
+                                        font.bold: true
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: routeColumn.orbitParamsExpanded = !routeColumn.orbitParamsExpanded
+                                    }
                                 }
 
                                 Rectangle {
@@ -857,6 +892,123 @@ ApplicationWindow {
                                         font.bold: true
                                     }
                                 }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                visible: routeColumn.orbitParamsExpanded && routePanelMode === "view"
+                                opacity: visible ? 1 : 0
+                                spacing: 10
+                                Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+
+                                Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Qt.rgba(1, 1, 1, 0.08) }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text { Layout.fillWidth: true; text: "Радиус орбиты"; color: textMuted; font.pixelSize: 11; font.family: "Inter" }
+                                        Text { text: hasApp ? Math.round(app.orbitRadiusM) + " м" : "-- м"; color: accent; font.pixelSize: 11; font.family: "Inter"; font.bold: true }
+                                    }
+                                    Slider {
+                                        id: orbitRadiusSliderAdditional
+                                        Layout.fillWidth: true
+                                        from: 10; to: 150; stepSize: 1
+                                        value: hasApp ? app.orbitRadiusM : 50
+                                        live: true
+                                        onMoved: { if (hasApp) app.setOrbitRadiusM(value) }
+                                        onPressedChanged: { if (!pressed && hasApp) app.setOrbitRadiusM(value) }
+                                        Connections {
+                                            target: hasApp ? app : null
+                                            function onOrbitRadiusMChanged() { orbitRadiusSliderAdditional.value = app.orbitRadiusM }
+                                        }
+                                        background: Rectangle {
+                                            x: orbitRadiusSliderAdditional.leftPadding; y: orbitRadiusSliderAdditional.topPadding + orbitRadiusSliderAdditional.availableHeight / 2 - height / 2
+                                            implicitWidth: 200; implicitHeight: 4; width: orbitRadiusSliderAdditional.availableWidth; height: implicitHeight
+                                            radius: 2; color: Qt.rgba(1, 1, 1, 0.12)
+                                            Rectangle { width: orbitRadiusSliderAdditional.visualPosition * parent.width; height: parent.height; radius: 2; color: accent }
+                                        }
+                                        handle: Rectangle {
+                                            x: orbitRadiusSliderAdditional.leftPadding + orbitRadiusSliderAdditional.visualPosition * orbitRadiusSliderAdditional.availableWidth - width / 2
+                                            y: orbitRadiusSliderAdditional.topPadding + orbitRadiusSliderAdditional.availableHeight / 2 - height / 2
+                                            implicitWidth: 14; implicitHeight: 14; radius: 7; color: accent
+                                        }
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text { Layout.fillWidth: true; text: "Точек на окружность"; color: textMuted; font.pixelSize: 11; font.family: "Inter" }
+                                        Text { text: hasApp ? app.orbitPointsPerCircle + " пт" : "-- пт"; color: accent; font.pixelSize: 11; font.family: "Inter"; font.bold: true }
+                                    }
+                                    Slider {
+                                        id: orbitPointsSlider
+                                        Layout.fillWidth: true
+                                        from: 4; to: 36; stepSize: 1
+                                        value: hasApp ? app.orbitPointsPerCircle : 12
+                                        live: true
+                                        onMoved: { if (hasApp) app.setOrbitPointsPerCircle(Math.round(value)) }
+                                        onPressedChanged: { if (!pressed && hasApp) app.setOrbitPointsPerCircle(Math.round(value)) }
+                                        Connections {
+                                            target: hasApp ? app : null
+                                            function onOrbitPointsPerCircleChanged() { orbitPointsSlider.value = app.orbitPointsPerCircle }
+                                        }
+                                        background: Rectangle {
+                                            x: orbitPointsSlider.leftPadding; y: orbitPointsSlider.topPadding + orbitPointsSlider.availableHeight / 2 - height / 2
+                                            implicitWidth: 200; implicitHeight: 4; width: orbitPointsSlider.availableWidth; height: implicitHeight
+                                            radius: 2; color: Qt.rgba(1, 1, 1, 0.12)
+                                            Rectangle { width: orbitPointsSlider.visualPosition * parent.width; height: parent.height; radius: 2; color: accent }
+                                        }
+                                        handle: Rectangle {
+                                            x: orbitPointsSlider.leftPadding + orbitPointsSlider.visualPosition * orbitPointsSlider.availableWidth - width / 2
+                                            y: orbitPointsSlider.topPadding + orbitPointsSlider.availableHeight / 2 - height / 2
+                                            implicitWidth: 14; implicitHeight: 14; radius: 7; color: accent
+                                        }
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text { Layout.fillWidth: true; text: "Резерв батареи (возврат)"; color: textMuted; font.pixelSize: 11; font.family: "Inter" }
+                                        Text { text: hasApp ? Math.round(app.minReturnPercent) + " %" : "-- %"; color: accentStrong; font.pixelSize: 11; font.family: "Inter"; font.bold: true }
+                                    }
+                                    Slider {
+                                        id: minReturnSlider
+                                        Layout.fillWidth: true
+                                        from: 5; to: 50; stepSize: 1
+                                        value: hasApp ? app.minReturnPercent : 20
+                                        live: true
+                                        onMoved: { if (hasApp) app.setMinReturnPercent(value) }
+                                        onPressedChanged: { if (!pressed && hasApp) app.setMinReturnPercent(value) }
+                                        Connections {
+                                            target: hasApp ? app : null
+                                            function onMinReturnPercentChanged() { minReturnSlider.value = app.minReturnPercent }
+                                        }
+                                        background: Rectangle {
+                                            x: minReturnSlider.leftPadding; y: minReturnSlider.topPadding + minReturnSlider.availableHeight / 2 - height / 2
+                                            implicitWidth: 200; implicitHeight: 4; width: minReturnSlider.availableWidth; height: implicitHeight
+                                            radius: 2; color: Qt.rgba(1, 1, 1, 0.12)
+                                            Rectangle { width: minReturnSlider.visualPosition * parent.width; height: parent.height; radius: 2; color: accentStrong }
+                                        }
+                                        handle: Rectangle {
+                                            x: minReturnSlider.leftPadding + minReturnSlider.visualPosition * minReturnSlider.availableWidth - width / 2
+                                            y: minReturnSlider.topPadding + minReturnSlider.availableHeight / 2 - height / 2
+                                            implicitWidth: 14; implicitHeight: 14; radius: 7; color: accentStrong
+                                        }
+                                    }
+                                }
+
+                                Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Qt.rgba(1, 1, 1, 0.08) }
                             }
 
                             ColumnLayout {
