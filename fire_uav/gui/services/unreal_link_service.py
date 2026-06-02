@@ -379,6 +379,9 @@ class UnrealLinkService(QObject):
         self._object_emit_ts: dict[str, float] = {}
         self._camera_suffix_preference = "camera.jpg"
         self._pyav_missing_warned = False
+        self._h264_disconnect_count = 0
+        self._h264_fallback_threshold = 3
+        self._h264_runtime_fallback_warned = False
         self._camera_info_fetched = False
 
     def start(self) -> None:
@@ -421,6 +424,8 @@ class UnrealLinkService(QObject):
             return
         log.info("Unreal camera mode switch: %s -> %s", self._camera_mode, normalized)
         self._camera_mode = normalized
+        self._h264_disconnect_count = 0
+        self._h264_runtime_fallback_warned = False
         self._start_camera_pipeline()
 
     # ----------------------------- internal setup ----------------------------- #
@@ -434,6 +439,7 @@ class UnrealLinkService(QObject):
         self._camera_timer.stop()
         self._stop_jpeg_worker()
         self._stop_stream_worker()
+        self._h264_disconnect_count = 0
         if self._camera_mode == "h264_stream":
             if av is None:
                 msg = "Unreal video mode 'h264_stream' requested, but PyAV is not installed; falling back to JPEG snapshots"
@@ -522,7 +528,34 @@ class UnrealLinkService(QObject):
     def _handle_stream_status(self, status: str) -> None:
         if self.sender() is not self._stream_worker:
             return
+        # Count both hard failures and "server not ready" (503) as H264 errors.
+        # A persistent 503 from Unreal means the H264 encoder isn't initialised;
+        # JPEG snapshots use a separate code path and may still work.
+        if status in ("disconnected", "waiting_for_route") and self._camera_enabled:
+            self._h264_disconnect_count += 1
+            if self._h264_disconnect_count >= self._h264_fallback_threshold:
+                self._fallback_to_jpeg_after_h264_errors()
+                return
+        elif status == "streaming":
+            self._h264_disconnect_count = 0
         self._set_camera_status(status)
+
+    def _fallback_to_jpeg_after_h264_errors(self) -> None:
+        msg = (
+            "Unreal H264 stream is not opening after repeated attempts; "
+            "falling back to JPEG snapshots"
+        )
+        if not self._h264_runtime_fallback_warned:
+            log.warning(msg)
+            self._h264_runtime_fallback_warned = True
+            if self._on_warning:
+                try:
+                    self._on_warning(msg)
+                except Exception:  # noqa: BLE001
+                    pass
+        self._camera_mode = "jpeg_snapshots"
+        self._set_camera_status("h264_runtime_jpeg_fallback")
+        self._start_camera_pipeline()
 
     # ----------------------------- public API ----------------------------- #
     def send_route(self, route: dict) -> bool:

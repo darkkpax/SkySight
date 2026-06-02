@@ -1724,6 +1724,9 @@ class AppController(QObject):
         if status == "pyav_missing_jpeg_fallback":
             self._set_camera_status_detail("PyAV missing; using JPEG fallback (requested H264)")
             self.set_camera_available(False)
+        elif status == "h264_runtime_jpeg_fallback":
+            self._set_camera_status_detail("H264 stream failed; using JPEG fallback")
+            self.set_camera_available(False)
         elif status == "waiting_for_route":
             self._set_camera_status_detail(f"Waiting for route / drone not spawned ({mode_label})")
             self.set_camera_available(False)
