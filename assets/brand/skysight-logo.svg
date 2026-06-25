@@ -1,0 +1,24 @@
+<svg width="1080" height="260" viewBox="0 0 1080 260" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SkySight logo">
+  <defs>
+    <linearGradient id="navy" x1="54" y1="20" x2="226" y2="226" gradientUnits="userSpaceOnUse"><stop stop-color="#082447"/><stop offset="1" stop-color="#0B3A68"/></linearGradient>
+    <linearGradient id="cyan" x1="88" y1="72" x2="182" y2="166" gradientUnits="userSpaceOnUse"><stop stop-color="#16D4FF"/><stop offset="1" stop-color="#1976D2"/></linearGradient>
+    <linearGradient id="fire" x1="112" y1="164" x2="150" y2="232" gradientUnits="userSpaceOnUse"><stop stop-color="#FFC247"/><stop offset="0.46" stop-color="#FF7A18"/><stop offset="1" stop-color="#F24B16"/></linearGradient>
+    <linearGradient id="text" x1="346" y1="55" x2="910" y2="197" gradientUnits="userSpaceOnUse"><stop stop-color="#082447"/><stop offset="0.52" stop-color="#0B3A68"/><stop offset="1" stop-color="#16BFEA"/></linearGradient>
+  </defs>
+  <g transform="translate(28 12) scale(0.88)">
+    <path d="M62 134C88 93 125 72 164 72C203 72 240 93 266 134C241 174 204 195 164 195C124 195 87 174 62 134Z" stroke="url(#navy)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="164" cy="134" r="50" fill="url(#cyan)"/>
+    <circle cx="164" cy="134" r="26" fill="#082447"/>
+    <circle cx="181" cy="114" r="11" fill="white" fill-opacity="0.95"/>
+    <path d="M60 86H112C121 86 128 93 128 102V112H200V102C200 93 207 86 216 86H268" stroke="url(#navy)" stroke-width="17" stroke-linecap="round"/>
+    <ellipse cx="31" cy="86" rx="43" ry="7" fill="#082447"/>
+    <ellipse cx="297" cy="86" rx="43" ry="7" fill="#082447"/>
+    <rect x="46" y="72" width="18" height="50" rx="9" fill="url(#navy)"/>
+    <rect x="264" y="72" width="18" height="50" rx="9" fill="url(#navy)"/>
+    <path d="M138 238C112 223 99 200 105 175C110 155 125 142 127 124C148 141 148 161 143 178C154 167 162 154 163 136C187 162 190 197 173 221C165 233 154 240 138 238Z" fill="url(#fire)"/>
+    <path d="M202 230C225 204 224 179 202 160C238 140 253 115 245 86C281 123 272 169 239 204C227 216 216 225 202 230Z" fill="#6688A5"/>
+    <path d="M202 230C225 204 224 179 202 160" stroke="white" stroke-opacity="0.62" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <text x="350" y="160" fill="url(#text)" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="96" font-weight="750" letter-spacing="-3">SkySight</text>
+  <text x="356" y="205" fill="#5F7C96" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="24" font-weight="500" letter-spacing="2">UAV FIRE · SMOKE · HUMAN DETECTION</text>
+</svg>
