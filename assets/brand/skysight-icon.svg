@@ -1,0 +1,34 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SkySight icon">
+  <defs>
+    <linearGradient id="navy" x1="112" y1="80" x2="408" y2="424" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#082447"/>
+      <stop offset="1" stop-color="#0B3A68"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="184" y1="166" x2="330" y2="312" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16D4FF"/>
+      <stop offset="1" stop-color="#1976D2"/>
+    </linearGradient>
+    <linearGradient id="fire" x1="210" y1="300" x2="268" y2="424" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFC247"/>
+      <stop offset="0.46" stop-color="#FF7A18"/>
+      <stop offset="1" stop-color="#F24B16"/>
+    </linearGradient>
+    <linearGradient id="smoke" x1="286" y1="282" x2="344" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A9C7DD"/>
+      <stop offset="1" stop-color="#4A6F91"/>
+    </linearGradient>
+  </defs>
+  <path d="M154 183C180 142 217 121 256 121C295 121 332 142 358 183C333 223 296 244 256 244C216 244 179 223 154 183Z" stroke="url(#navy)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="183" r="58" fill="url(#cyan)"/>
+  <circle cx="256" cy="183" r="30" fill="#082447"/>
+  <circle cx="275" cy="160" r="13" fill="white" fill-opacity="0.95"/>
+  <path d="M150 128H209C219 128 226 136 226 145V155H286V145C286 136 293 128 303 128H362" stroke="url(#navy)" stroke-width="18" stroke-linecap="round"/>
+  <ellipse cx="116" cy="128" rx="48" ry="8" fill="#082447"/>
+  <ellipse cx="396" cy="128" rx="48" ry="8" fill="#082447"/>
+  <rect x="132" y="112" width="20" height="56" rx="10" fill="url(#navy)"/>
+  <rect x="360" y="112" width="20" height="56" rx="10" fill="url(#navy)"/>
+  <path d="M226 416C197 399 183 374 190 346C195 324 211 310 214 290C237 309 237 331 232 350C245 338 253 324 254 304C280 332 283 370 265 397C256 411 244 418 226 416Z" fill="url(#fire)"/>
+  <path d="M296 405C322 376 320 348 296 328C336 305 353 278 344 246C384 287 374 338 337 376C324 390 311 400 296 405Z" fill="url(#smoke)"/>
+  <path d="M296 405C322 376 320 348 296 328" stroke="white" stroke-opacity="0.65" stroke-width="10" stroke-linecap="round"/>
+  <path d="M164 276C198 308 314 308 348 276" stroke="#17BDEB" stroke-width="12" stroke-linecap="round" opacity="0.38"/>
+</svg>
