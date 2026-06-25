@@ -1,58 +1,132 @@
-# Как устроен проект
+# как работает SkySight
 
-Документ коротко описывает реальные потоки данных в `fire_uav`, чтобы было понятно, что запускается в каждом режиме и где искать код.
+SkySight состоит из наземной станции, бортового модуля, симулятора Unreal Engine и вспомогательных сервисов. Основной сценарий: камера БПЛА передаёт кадры, модель находит опасные объекты, система переводит их в координаты карты, подтверждает событие и показывает оператору.
 
-## Режимы запуска и роли
-- Единственная точка входа — `poetry run python -m fire_uav.main`.
-- Роль определяется `FIRE_UAV_ROLE` или полем `role` в `fire_uav/config/settings_default.json`.
-  - `ground` (по умолчанию) — десктопный GUI на PySide6/Qt Quick.
-  - `module` — бортовой headless-режим с телеметрией, планировщиком маршрутов и watchdog.
+## общая схема
 
-## Ground (GUI)
-- Вход: `fire_uav/ground_app/main_ground.py`.
-- Qt WebEngine/QML UI (`fire_uav/gui/qml/main.qml`), управляется через ViewModel из `fire_uav/gui`.
-- Инициализация `init_core()` из `fire_uav/bootstrap.py`:
-  - Создаёт очереди кадров/детекций и `LifecycleManager`.
-  - Подписывает шину событий (`fire_uav/services/bus.py`) на `APP_START/APP_STOP`.
-  - Если камера доступна — поднимает `CameraThread` и `DetectThread` (YOLO) из `fire_uav/services/components`.
-- REST (`fire_uav/api/main_rest.py`) использует те же очереди и шину:
-  - `POST /api/camera/start|stop` — старт/стоп потоков.
-  - `POST /api/detections` — принимает сырые детекции+телеметрию, прогоняет через пайплайн (агрегация голосованием K из N, геопроекция) и возвращает подтверждённые цели.
-  - `GET /metrics` — Prometheus.
+```mermaid
+flowchart TB
+    subgraph UAV[Бортовой модуль]
+        CAM[Камера / видеопоток]
+        DET[YOLO-инференс]
+        SMOOTH[BBox smoothing]
+        GEO[GeoProjector]
+        AGG[K/N aggregation]
+        REG[Object registry]
+        PLAN[Route planner]
+    end
 
-## Module (борт)
-- Вход: `fire_uav/module_app/main_module.py` (выбирается автоматом при `role=module`).
-- Шаги запуска:
-  1) Чтение настроек и логов (`fire_uav/config/settings.py`, `logging_config`).
-  2) Инициализация базовых очередей (`init_core()`), создание моделей: `PythonEnergyModel`, `PythonRoutePlanner`, `GeoProjector` (Python или native C++).
-  3) Сборка `DetectionPipeline` (агрегатор подтверждает цели, transmitter отправляет на наземную станцию, опционально визуализатор).
-  4) Выбор адаптера UAV (`fire_uav/module_core/adapters/*`):
-     - `stub` (по умолчанию) — генерирует фиктивную телеметрию.
-     - `mavlink` — заглушка под pymavlink/DroneKit.
-     - `unreal` — HTTP-мост к симулятору.
-     - `custom` — внешний SDK через HTTP/gRPC (инъекция телеметрии извне).
-  5) Health-сервер на Uvicorn (`/health`) + watchdog, который ругается, если нет телеметрии/детекций дольше порогов.
-- События `APP_START/APP_STOP` пробрасываются в шину, чтобы корректно останавливать компоненты.
+    subgraph GROUND[Наземная станция]
+        API[REST API]
+        BUS[EventBus]
+        STORE[Confirmed objects store]
+        GUI[PySide6 / QML GUI]
+        MAP[OpenLayers map]
+    end
 
-## Интеграции
-- **Integration service** (`integration_service/app.py`): лёгкий FastAPI-брокер, чтобы внешние клиенты слали телеметрию/маршрут/команды. Он заполняет `CustomSdkUavAdapter`.
-- **Ground station**: если включено `ground_station_enabled`, `Transmitter` отправляет подтверждённые детекции по UDP/TCP.
-- **Visualizer**: `VisualizerAdapter` умеет публиковать телеметрию/объекты во внешний визуализатор (выключен по умолчанию).
-- **API защита и метрики**: если выставить `FIRE_UAV_API_TOKEN`, все FastAPI-приложения (REST, visualizer, integration_service) потребуют `X-API-Key`/`Authorization`. HTTP метрики FastAPI доступны на `/metrics/http` (REST) и `/metrics` (прочие).
+    subgraph SIM[Unreal Engine]
+        DRONE[Drone pawn]
+        WORLD[World manager]
+        VIDEO[Video stream]
+        TEL[Telemetry]
+    end
 
-## Конфигурация
-- Базовые параметры: `fire_uav/config/settings_default.json`.
-- Переопределения через `FIRE_UAV_SETTINGS` (путь к JSON) и `FIRE_UAV_PROFILE` (`dev/demo/jetson`).
-- Ключевые поля: `role`, `uav_backend`, `mavlink_connection_string`, `unreal_base_url`, `use_native_core`, `visualizer_enabled`, таймауты watchdog.
+    SIM --> CAM
+    CAM --> DET --> SMOOTH --> GEO --> AGG --> REG
+    REG --> PLAN
+    REG --> API --> BUS --> STORE --> GUI --> MAP
+    PLAN --> SIM
+```
 
-## Native ускорения
-- Директория `cpp/native_core`: pybind11-модуль для быстрой геопроекции, трекера bbox и энергомодели.
-- Если собрать `.so` и выставить `use_native_core=true`, фабрики (`fire_uav/module_core/factories.py`) автоматически возьмут native-реализацию.
+## режимы запуска
 
-## Где искать логику
-- Шина событий: `fire_uav/services/bus.py`.
-- Метрики: `fire_uav/services/metrics.py`.
-- Пайплайн детекций и агрегации: `fire_uav/module_core/detections/*`.
-- Планировщик маршрутов: `fire_uav/module_core/route/*`.
-- Адаптеры UAV: `fire_uav/module_core/adapters/*`.
-- Запуск GUI: `fire_uav/ground_app/main_ground.py`; борт: `fire_uav/module_app/main_module.py`.
+единственная точка входа — `python -m fire_uav.main`. Роль выбирается через переменную `FIRE_UAV_ROLE` или поле `role` в `fire_uav/config/settings_default.json`.
+
+| роль | назначение |
+|---|---|
+| `ground` | графическая наземная станция оператора |
+| `module` | бортовой headless-модуль с детекцией, телеметрией и маршрутизацией |
+
+## бортовой модуль
+
+бортовой модуль отвечает за обработку данных около источника видео. В реальном сценарии он может работать на Jetson, мини-ПК или другом вычислителе, связанном с дроном.
+
+основные задачи:
+
+- получение кадров с камеры;
+- запуск YOLO-модели;
+- фильтрация классов;
+- сглаживание bbox между кадрами;
+- пересчёт координат bbox в географическое положение;
+- подтверждение целей через агрегацию;
+- передача результата в наземную станцию;
+- корректировка маршрута при появлении цели.
+
+точка входа: `fire_uav/module_app/main_module.py`.
+
+## наземная станция
+
+наземная станция нужна оператору. Она показывает карту, телеметрию, видеопоток, найденные объекты и события системы.
+
+типовая логика интерфейса:
+
+1. оператор выбирает район обследования;
+2. система строит маршрут;
+3. БПЛА выполняет полёт;
+4. найденные объекты появляются на карте;
+5. оператор подтверждает тревогу или продолжает наблюдение;
+6. при необходимости дрон уходит на облёт цели или возвращается на маршрут.
+
+точка входа: `fire_uav/ground_app/main_ground.py`. Интерфейс находится в `fire_uav/gui/qml/`, связка Python ↔ QML — в `fire_uav/gui/viewmodels/`.
+
+## детекция и агрегация
+
+одиночная детекция на кадре не считается окончательным событием. Для снижения ложных срабатываний используется несколько уровней проверки:
+
+| уровень | назначение |
+|---|---|
+| confidence threshold | отсекает слабые предсказания модели |
+| IoU threshold | управляет NMS и пересечениями bbox |
+| bbox smoothing | уменьшает дрожание рамок |
+| K/N voting | подтверждает цель только после нужного числа попаданий в окне кадров |
+| geo deduplication | объединяет близкие цели в одну запись |
+| suppression TTL | временно подавляет повторные тревоги в той же зоне |
+
+## геопроекция
+
+геопроекция нужна, чтобы из bbox на изображении получить примерную точку на карте. Для расчёта используются:
+
+- ширина и высота кадра;
+- параметры камеры;
+- FOV;
+- высота полёта;
+- pitch, roll, yaw;
+- координаты БПЛА;
+- направление камеры.
+
+если доступен native core, часть расчётов может быть перенесена в C++.
+
+## маршруты
+
+маршрутизатор строит маршрут обследования и может добавлять манёвры вокруг подтверждённых целей.
+
+поддерживаемые идеи:
+
+- grid / lawn-mower маршрут для покрытия площади;
+- TSP-оптимизация порядка точек;
+- ограничения по батарее и запасу на возвращение;
+- no-fly зоны через GeoJSON;
+- orbit-маршруты вокруг одной или нескольких целей.
+
+## интеграции
+
+| интеграция | назначение |
+|---|---|
+| `unreal` | HTTP-мост к Unreal Engine симулятору |
+| `stub` | локальная имитация телеметрии и видео для разработки |
+| `mavlink` | подключение реального БПЛА через MAVLink |
+| `custom` | внешний SDK через `integration_service` |
+
+## Unreal Engine
+
+Unreal Engine используется как управляемый симулятор. Он отдаёт телеметрию и видео, а Python-часть может отправлять команды и маршруты. Это позволяет тестировать систему без реального БПЛА и безопасно отлаживать сценарии пожара, дыма и поиска людей.
